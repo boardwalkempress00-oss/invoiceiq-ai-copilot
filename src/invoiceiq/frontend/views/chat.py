@@ -14,6 +14,8 @@ from invoiceiq.frontend.presentation import (
     SUGGESTED_QUESTIONS,
     answer_source_label,
     history_payload,
+    spend_label,
+    token_note,
 )
 
 MAX_QUESTION_CHARS = int(os.getenv("CHAT_MAX_QUESTION_CHARS", "500"))
@@ -65,10 +67,14 @@ def render_assistant(message: dict[str, Any], policy: dict[str, dict[str, Any]])
         parts.append(f"AI {response['timings']['ai_ms']:.0f} ms")
     if response.get("usage"):
         usage = response["usage"]
-        estimated = " (estimated)" if usage["source"] == "estimated" else ""
-        parts.append(f"{usage['total_tokens']} tokens{estimated}")
-    if response.get("estimated_cost") is not None:
-        parts.append(f"≈ {response['estimated_cost']} {response['cost_currency']}")
+        parts.append(f"{usage['total_tokens']} tokens{token_note([usage['source']])}")
+    if response.get("cost_is_simulated") or response.get("estimated_cost") is not None:
+        spend = spend_label(
+            response.get("estimated_cost"),
+            response.get("cost_currency"),
+            bool(response.get("cost_is_simulated")),
+        )
+        parts.append(f"AI spend {spend}")
     parts.append(f"ID `{response['correlation_id']}`")
     st.caption(" · ".join(parts))
 

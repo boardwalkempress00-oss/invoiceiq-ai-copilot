@@ -281,3 +281,21 @@ def test_every_backend_read_only_reason_has_a_label():
     from invoiceiq.frontend.presentation import READ_ONLY_REASON_TEXT
 
     assert {r.value for r in ReadOnlyReason} <= set(READ_ONLY_REASON_TEXT)
+
+
+def test_token_note_labels_simulated_and_estimated_usage():
+    from invoiceiq.frontend.presentation import token_note
+
+    assert token_note(["provider"]) == ""
+    assert token_note(["simulated"]) == " (simulated)"
+    assert token_note(["simulated", "provider"]) == " (incl. simulated)"
+    assert token_note(["estimated"]) == " (estimated)"
+    assert token_note([None]) == ""
+
+
+def test_spend_label_never_shows_a_cost_for_mock_answers():
+    from invoiceiq.frontend.presentation import spend_label
+
+    assert spend_label("0.000815", "USD", simulated=True) == "0 USD (mock, no model call)"
+    assert spend_label("0.000720", "USD", simulated=False) == "≈ 0.000720 USD"
+    assert spend_label(None, None, simulated=False) == "—"

@@ -185,7 +185,8 @@ def test_observability_reflects_real_chat_measurements(run_page):
     metrics = {m.label: m.value for m in at.metric}
     assert metrics["Chat requests"] == "1"
     assert metrics["Last AI latency"] != "—"
-    assert "Tokens used (estimated)" in metrics
+    assert "Tokens used (simulated)" in metrics
+    assert metrics["AI spend (mock: no model calls)"] == "0 USD"
     table = at.dataframe[0].value
     assert "POST /chat" in list(table["Request"])
 

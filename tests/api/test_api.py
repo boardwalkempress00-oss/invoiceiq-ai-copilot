@@ -94,7 +94,9 @@ def test_chat_returns_grounded_answer(client):
     assert body["verified_facts"][0] == {
         "label": "Validation status", "value": "Flagged", "source_id": "VAL-RESULT"
     }  # fmt: skip
-    assert body["usage"]["source"] == "estimated"
+    assert body["usage"]["source"] == "simulated"  # mock: not real model usage
+    assert body["cost_is_simulated"] is True
+    assert body["estimated_cost"] == "0"  # no model call → no spend
     assert body["timings"]["ai_ms"] is not None
     assert body["limits"]["session_remaining"] == 9
     assert body["correlation_id"] == response.headers["X-Correlation-ID"]

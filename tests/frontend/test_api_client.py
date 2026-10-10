@@ -36,8 +36,8 @@ def test_chat_records_real_measurement(api_client):
     assert m.correlation_id == response["correlation_id"]
     assert m.server_ms is not None and m.round_trip_ms >= 0
     assert m.ai_ms == response["timings"]["ai_ms"]
-    assert m.token_source == "estimated"
-    assert m.estimated_cost is None  # prices not configured → no invented cost
+    assert m.token_source == "simulated"
+    assert m.estimated_cost == "0"  # mock: no model call, spend is exactly zero
 
 
 def test_api_error_carries_backend_message_and_correlation_id(api_client):

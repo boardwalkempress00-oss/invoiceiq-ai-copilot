@@ -173,6 +173,7 @@ def _to_response(outcome: ChatOutcome) -> ChatResponse:
         else None,
         estimated_cost=outcome.estimated_cost,
         cost_currency=outcome.cost_currency,
+        cost_is_simulated=outcome.cost_is_simulated,
         timings=TimingsOut(
             retrieval_ms=outcome.timings.retrieval_ms,
             ai_ms=outcome.timings.ai_ms,

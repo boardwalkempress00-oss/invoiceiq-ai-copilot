@@ -89,7 +89,7 @@ class UsageOut(_Schema):
     prompt_tokens: int
     completion_tokens: int
     total_tokens: int
-    source: Literal["provider", "estimated"]
+    source: Literal["provider", "estimated", "simulated"]
 
 
 class TimingsOut(_Schema):
@@ -121,6 +121,9 @@ class ChatResponse(_Schema):
     usage: UsageOut | None
     estimated_cost: Decimal | None
     cost_currency: str | None
+    cost_is_simulated: bool = Field(
+        default=False, description="True for the offline mock: no model call, spend is 0."
+    )
     timings: TimingsOut
     limits: LimitsOut
     correlation_id: str

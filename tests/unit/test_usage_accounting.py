@@ -156,3 +156,72 @@ def test_managed_identity_client_built_without_network():
     store = AzureTableUsageStore.from_settings(settings)
     assert store.shared_durable is True
     assert store._table.table_name == "aiusage"
+
+
+# --- Mock vs live cost accounting --------------------------------------------------------------
+
+
+def test_mock_chat_counts_requests_but_spends_nothing():
+    service = make_service(**PRICES)  # default provider: MockChatProvider (not live)
+    outcome = ask(service, "Explain")
+    assert outcome.mode == ChatMode.AI
+    assert outcome.usage.source == "simulated"
+    assert outcome.estimated_cost == Decimal("0") and outcome.cost_is_simulated
+    usage = snapshot(service)
+    assert usage.requests == 1  # still counted against request limits
+    assert (usage.reserved_cost_micro, usage.spent_cost_micro) == (0, 0)
+    assert usage.estimated_tokens == 0  # simulated tokens are not reserved
+    assert (usage.actual_prompt_tokens, usage.actual_completion_tokens) == (0, 0)
+    assert usage.unreconciled == 0
+
+
+def test_mock_chat_respects_session_limit():
+    service = make_service(session_request_limit=1, **PRICES)
+    assert ask(service, "Explain").mode == ChatMode.AI
+    blocked = ask(service, "Explain")
+    assert blocked.mode == ChatMode.READ_ONLY
+    assert blocked.read_only_reason.value == "session_limit_reached"
+
+
+def test_mock_chat_respects_global_request_limit():
+    service = make_service(global_daily_request_limit=1, **PRICES)
+    assert ask(service, "Explain", session="session-01").mode == ChatMode.AI
+    blocked = ask(service, "Explain", session="session-02")
+    assert blocked.read_only_reason.value == "daily_limit_reached"
+
+
+def test_mock_chat_does_not_consume_monetary_budget():
+    # Through the real app wiring: a zero monetary budget must not block mock answers.
+    settings = Settings(_env_file=None, global_daily_cost_limit="0", **PRICES)
+    client = TestClient(create_app(settings))
+    for i in range(3):
+        body = client.post(
+            "/chat",
+            json={
+                "invoice_id": "inv-001",
+                "question": "Explain",
+                "session_id": f"mock-sess-{i:02d}",
+            },
+        ).json()
+        assert body["mode"] == "ai" and body["estimated_cost"] == "0"
+
+
+def test_live_chat_reports_real_estimated_cost():
+    service = make_service(ScriptedProvider("ok [VAL-RESULT]"), **PRICES)
+    outcome = ask(service, "Explain")
+    assert outcome.cost_is_simulated is False
+    assert outcome.estimated_cost == Decimal("0.000720")  # 1000 × 0.40 + 200 × 1.60 per 1M
+    assert snapshot(service).estimated_tokens > 0  # live reservations include a token estimate
+
+
+def test_live_provider_without_reported_usage_is_charged_at_estimate():
+    class NoUsageProvider(ScriptedProvider):
+        def generate(self, request):
+            result = super().generate(request)
+            return type(result)(text=result.text, model=result.model, usage=None)
+
+    service = make_service(NoUsageProvider("ok [VAL-RESULT]"), **PRICES)
+    ask(service, "Explain")
+    usage = snapshot(service)
+    assert usage.spent_cost_micro > 0 and usage.unreconciled == 1
+    assert usage.actual_prompt_tokens == 0  # nothing invented

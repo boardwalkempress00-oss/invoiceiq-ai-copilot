@@ -176,6 +176,7 @@ class ChatOutcome:
     usage: TokenUsage | None = None
     estimated_cost: Decimal | None = None
     cost_currency: str | None = None
+    cost_is_simulated: bool = False
     read_only_reason: ReadOnlyReason | None = None
     notice: str | None = None
     removed_citations: list[str] = field(default_factory=list)
@@ -351,7 +352,14 @@ class ChatService:
             question=question,
             max_output_tokens=self._settings.ai_max_output_tokens,
         )
-        estimate = estimate_usage(request.messages, request.max_output_tokens, self._settings)
+        # Only a live (paid) model consumes the monetary budget. Non-live providers still use the
+        # request limits (session and daily), but reserve zero cost and zero tokens.
+        live = self._provider.is_live
+        estimate = (
+            estimate_usage(request.messages, request.max_output_tokens, self._settings)
+            if live
+            else UsageEstimate()
+        )
 
         try:
             decision = self._limiter.reserve(session_id, estimate)
@@ -391,12 +399,19 @@ class ChatService:
             self._settle(reservation, SettleOutcome.AMBIGUOUS)
             raise
         ai_ms = (time.perf_counter() - ai_started) * 1000
+        # Record usage as "actual" only when the provider reported it. Simulated (mock) usage is
+        # neither actual tokens nor spend.
+        reported = (
+            result.usage if live and result.usage and result.usage.source == "provider" else None
+        )
         self._settle(
             reservation,
             SettleOutcome.SUCCEEDED,
-            prompt_tokens=result.usage.prompt_tokens if result.usage else None,
-            completion_tokens=result.usage.completion_tokens if result.usage else None,
-            actual_cost_micro=cost_micro(result.usage, self._settings) if result.usage else None,
+            prompt_tokens=reported.prompt_tokens if reported else None,
+            completion_tokens=reported.completion_tokens if reported else None,
+            actual_cost_micro=(
+                cost_micro(reported, self._settings) if reported else (0 if not live else None)
+            ),
         )
 
         text, used_ids, removed = enforce_citations(result.text, context.allowed_ids)
@@ -409,7 +424,9 @@ class ChatService:
         if result.truncated:
             text += "\n\n_(Answer shortened to stay within the response length limit.)_"
 
-        cost = estimate_cost(result.usage, self._settings)
+        # Spend shown to users: zero for a non-live provider (no model was called), otherwise an
+        # estimate from reported tokens × configured prices.
+        cost = estimate_cost(result.usage, self._settings) if live else Decimal("0")
         logger.info(
             "chat.completed",
             extra={
@@ -438,6 +455,7 @@ class ChatService:
             usage=result.usage,
             estimated_cost=cost,
             cost_currency=self._settings.ai_price_currency if cost is not None else None,
+            cost_is_simulated=not live,
             notice=notice,
             removed_citations=removed,
             grounded=grounded,

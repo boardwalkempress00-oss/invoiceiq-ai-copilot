@@ -336,6 +336,30 @@ def history_payload(
     return turns[-limit:] if limit else []
 
 
+# --- Usage labels ------------------------------------------------------------------------------
+
+
+def token_note(sources: Iterable[str | None]) -> str:
+    """Qualifier for token counts: provider-reported counts need none."""
+    kinds = {s for s in sources if s}
+    if kinds == {"simulated"}:
+        return " (simulated)"
+    if "simulated" in kinds:
+        return " (incl. simulated)"
+    if "estimated" in kinds:
+        return " (estimated)"
+    return ""
+
+
+def spend_label(cost: str | Decimal | None, currency: str | None, simulated: bool) -> str:
+    """AI spend for display. Mock answers cost nothing because no model is called."""
+    if simulated:
+        return f"0 {currency or 'USD'} (mock, no model call)"
+    if cost is None:
+        return "—"
+    return f"≈ {Decimal(str(cost)):.6f} {currency or ''}".strip()
+
+
 # --- Observability ---------------------------------------------------------------------------
 
 
@@ -351,6 +375,7 @@ class ObservabilitySummary:
     prompt_tokens: int
     completion_tokens: int
     token_sources: frozenset[str]
+    simulated_chat_requests: int
     estimated_cost: Decimal | None
     cost_currency: str | None
 
@@ -379,6 +404,7 @@ def summarize(measurements: Sequence[Measurement]) -> ObservabilitySummary:
         prompt_tokens=sum(m.prompt_tokens or 0 for m in chats),
         completion_tokens=sum(m.completion_tokens or 0 for m in chats),
         token_sources=frozenset(m.token_source for m in chats if m.token_source),
+        simulated_chat_requests=sum(1 for m in chats if m.token_source == "simulated"),
         estimated_cost=total_cost,
         cost_currency=next(iter(currencies), None) if total_cost is not None else None,
     )

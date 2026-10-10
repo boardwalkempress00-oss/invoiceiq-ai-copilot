@@ -32,7 +32,9 @@ AZURE_COGNITIVE_SCOPE = "https://cognitiveservices.azure.com/.default"
 class TokenUsage:
     prompt_tokens: int
     completion_tokens: int
-    source: Literal["provider", "estimated"]
+    # provider: reported by the paid model; estimated: pre-call estimate for a live model;
+    # simulated: produced by the offline mock — not real model usage and never billed.
+    source: Literal["provider", "estimated", "simulated"]
 
     @property
     def total_tokens(self) -> int:
@@ -129,7 +131,7 @@ class MockChatProvider:
                 "steps, or draft a follow-up email to the supplier. [VAL-RESULT]"
             )
         prompt = "".join(m["content"] for m in request.messages)
-        usage = TokenUsage(estimate_tokens(prompt), estimate_tokens(text), "estimated")
+        usage = TokenUsage(estimate_tokens(prompt), estimate_tokens(text), "simulated")
         return GenerationResult(text=text, model=self.model, usage=usage)
 
     # -- templates -------------------------------------------------------------------------------

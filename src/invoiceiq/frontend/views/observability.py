@@ -5,7 +5,7 @@ from __future__ import annotations
 import streamlit as st
 
 from invoiceiq.frontend import components, state
-from invoiceiq.frontend.presentation import measurement_rows, summarize
+from invoiceiq.frontend.presentation import measurement_rows, summarize, token_note
 
 st.title("Observability")
 st.caption(
@@ -62,24 +62,28 @@ row[0].metric("Chat requests", summary.chat_requests, border=True)
 row[1].metric("Last AI latency", fmt_ms(summary.last_ai_ms), border=True,
               help="Time spent in the AI provider call, measured by the backend.")  # fmt: skip
 tokens = summary.prompt_tokens + summary.completion_tokens
-token_note = ""
-if "estimated" in summary.token_sources:
-    token_note = " (estimated)"
 row[2].metric(
-    f"Tokens used{token_note}",
+    f"Tokens used{token_note(summary.token_sources)}",
     f"{tokens:,}" if summary.chat_requests else "—",
     border=True,
-    help="Reported by Azure OpenAI when available. The mock provider estimates ~4 characters "
-    "per token and is labelled as an estimate.",
+    help="Reported by Azure OpenAI for live answers. In mock mode the counts are simulated "
+    "(~4 characters per token) to show the pipeline — no model is called.",
 )
+all_simulated = (
+    summary.chat_requests > 0 and summary.simulated_chat_requests == summary.chat_requests
+)
+if all_simulated:
+    spend_value = f"0 {summary.cost_currency or 'USD'}"
+elif summary.estimated_cost is not None:
+    spend_value = f"{summary.estimated_cost:.6f} {summary.cost_currency}"
+else:
+    spend_value = "—"
 row[3].metric(
-    "Estimated AI cost",
-    f"{summary.estimated_cost:.6f} {summary.cost_currency}"
-    if summary.estimated_cost is not None
-    else "—",
+    "AI spend (mock: no model calls)" if all_simulated else "Estimated AI cost",
+    spend_value,
     border=True,
-    help="Tokens × configured model prices (AI_PRICE_*). Shown as — when prices are not "
-    "configured. Not an invoice from Azure.",
+    help="Live answers: reported tokens × configured model prices (AI_PRICE_*), an estimate, "
+    "not an Azure invoice. Mock answers call no model, so their spend is exactly 0.",
 )
 
 st.subheader("Recent requests")
