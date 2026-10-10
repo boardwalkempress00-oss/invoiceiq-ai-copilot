@@ -22,4 +22,9 @@ provider "azurerm" {
   subscription_id = var.subscription_id # null → falls back to ARM_SUBSCRIPTION_ID
   # Use Entra ID (not shared keys) for any storage data-plane calls the provider makes.
   storage_use_azuread = true
+  # Never register resource providers implicitly (that is a subscription-wide change, and the
+  # provider would do it even during `plan`). Required providers are registered deliberately:
+  # Microsoft.App, Microsoft.CognitiveServices, Microsoft.Storage, Microsoft.OperationalInsights,
+  # Microsoft.ManagedIdentity, Microsoft.Authorization and Microsoft.Consumption.
+  resource_provider_registrations = "none"
 }
