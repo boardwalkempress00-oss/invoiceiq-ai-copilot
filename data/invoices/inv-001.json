@@ -1,0 +1,31 @@
+{
+  "invoice_id": "inv-001",
+  "invoice_number": "NOS-2026-0142",
+  "vendor": {
+    "name": "Nordlys Office Supplies ApS",
+    "vat_number": "DEMO-VAT-0001",
+    "country": "DK",
+    "email": "accounts@nordlys-office.example"
+  },
+  "buyer": {
+    "name": "Aurora Nordic Trading ApS",
+    "country": "DK",
+    "cost_center": "CC-210 Operations"
+  },
+  "issue_date": "2026-09-02",
+  "due_date": "2026-10-02",
+  "currency": "DKK",
+  "purchase_order": "PO-55012",
+  "line_items": [
+    {"line_id": "1", "description": "Recycled A4 copy paper, box of 5 reams", "quantity": "20", "unit_price": "189.00", "line_total": "3780.00"},
+    {"line_id": "2", "description": "Ergonomic desk mat", "quantity": "6", "unit_price": "345.50", "line_total": "2073.00"},
+    {"line_id": "3", "description": "Whiteboard marker set (12 colours)", "quantity": "4", "unit_price": "89.75", "line_total": "359.00"},
+    {"line_id": "4", "description": "Delivery and handling", "quantity": "1", "unit_price": "150.00", "line_total": "150.00"}
+  ],
+  "subtotal": "6362.00",
+  "vat_rate": "0.25",
+  "vat_amount": "1590.50",
+  "total": "7952.50",
+  "approval": null,
+  "notes": "Fictional demo invoice: correct arithmetic, below the approval threshold."
+}

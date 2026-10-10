@@ -1,0 +1,30 @@
+{
+  "invoice_id": "inv-003",
+  "invoice_number": "KFS-2026-0203",
+  "vendor": {
+    "name": "Kystlinje Facility Services ApS",
+    "vat_number": "DEMO-VAT-0003",
+    "country": "DK",
+    "email": "invoices@kystlinje-facility.example"
+  },
+  "buyer": {
+    "name": "Aurora Nordic Trading ApS",
+    "country": "DK",
+    "cost_center": "CC-120 Facilities"
+  },
+  "issue_date": "2026-09-30",
+  "due_date": "2026-10-30",
+  "currency": "DKK",
+  "purchase_order": "PO-55164",
+  "line_items": [
+    {"line_id": "1", "description": "Monthly office cleaning, September 2026", "quantity": "1", "unit_price": "8750.00", "line_total": "8750.00"},
+    {"line_id": "2", "description": "External window cleaning", "quantity": "3", "unit_price": "1100.00", "line_total": "3300.00"},
+    {"line_id": "3", "description": "Carpet deep clean, meeting rooms", "quantity": "2", "unit_price": "200.00", "line_total": "400.00"}
+  ],
+  "subtotal": "12450.00",
+  "vat_rate": "0.25",
+  "vat_amount": "3312.50",
+  "total": "15762.50",
+  "approval": null,
+  "notes": "Fictional demo invoice: the stated VAT amount (and therefore the total) does not match the line items."
+}

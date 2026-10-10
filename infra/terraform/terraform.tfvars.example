@@ -1,0 +1,28 @@
+# Copy to terraform.tfvars (git-ignored) and fill in. Contains no secrets.
+
+# subscription_id = "00000000-0000-0000-0000-000000000000"   # or export ARM_SUBSCRIPTION_ID
+location        = "swedencentral"
+# openai_location = "swedencentral"   # only if the model is unavailable in `location`
+
+container_image = "ghcr.io/<github-owner>/invoiceiq:<git-sha>"
+
+# VERIFY before applying — availability and versions change:
+#   az cognitiveservices model list -l swedencentral \
+#     --query "[?model.name=='<model>'].{version:model.version, skus:model.skus[].name}" -o table
+openai_model_name     = "<model-name>"
+openai_model_version  = "<model-version>"
+openai_deployment_sku = "GlobalStandard"
+openai_capacity_k_tpm = 10
+
+# Prices per 1M tokens for that model, deployment type and region (Azure OpenAI pricing page).
+ai_price_input_per_1m  = "<input-price>"
+ai_price_output_per_1m = "<output-price>"
+ai_price_currency      = "USD"
+
+global_daily_cost_limit    = "1.00"
+global_daily_request_limit = 200
+session_request_limit      = 10
+
+# Free budget alert on the resource group (alerts only).
+# budget_alert_email    = "you@example.com"
+# monthly_budget_amount = 10

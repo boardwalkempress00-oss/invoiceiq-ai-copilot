@@ -1,0 +1,122 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  UV_VERSION: "0.11.23"
+  TERRAFORM_VERSION: "1.15.8"
+  AZURITE_IMAGE: mcr.microsoft.com/azure-storage/azurite:3.35.0
+
+jobs:
+  python:
+    name: Lint and test
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: ${{ env.UV_VERSION }}
+          enable-cache: true
+
+      - name: Install dependencies
+        run: uv sync --frozen
+
+      - name: Ruff
+        run: |
+          uv run ruff format --check .
+          uv run ruff check .
+
+      - name: Start Azurite (Table Storage emulator)
+        run: |
+          docker run -d --name azurite -p 127.0.0.1:10002:10002 "$AZURITE_IMAGE" \
+            azurite-table --tableHost 0.0.0.0 --tablePort 10002 --skipApiVersionCheck --loose
+          for i in $(seq 1 30); do nc -z 127.0.0.1 10002 && exit 0; sleep 1; done
+          echo "Azurite did not start" >&2; exit 1
+
+      - name: Pytest (unit, API, frontend, Azurite integration)
+        env:
+          AZURITE_REQUIRED: "1"
+        run: uv run pytest --cov=invoiceiq --cov-report=term --cov-report=xml
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: coverage
+          path: coverage.xml
+          retention-days: 7
+
+  terraform:
+    name: Terraform validate and test
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: infra/terraform
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TERRAFORM_VERSION }}
+
+      - run: terraform fmt -check -recursive
+      - run: terraform init -backend=false -input=false -lockfile=readonly
+      - run: terraform validate
+      # Plan tests use mocked providers: no Azure credentials, no API calls.
+      - run: terraform test
+
+  docker:
+    name: Docker build and smoke test
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          load: true
+          push: false
+          tags: invoiceiq:ci
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Smoke test container
+        run: |
+          docker run -d --name invoiceiq -p 127.0.0.1:8501:8501 invoiceiq:ci
+          for i in $(seq 1 30); do
+            status=$(docker inspect -f '{{.State.Health.Status}}' invoiceiq)
+            [ "$status" = "healthy" ] && break
+            sleep 3
+          done
+          echo "health: $status"; [ "$status" = "healthy" ]
+          curl -fsS http://127.0.0.1:8501/_stcore/health
+          test "$(docker exec invoiceiq id -u)" = "10001"
+          # The API must not be published outside the container.
+          if curl -fsS -m 3 http://127.0.0.1:8000/health; then echo "API exposed" >&2; exit 1; fi
+          docker exec invoiceiq python -c "import urllib.request as u; print(u.urlopen('http://127.0.0.1:8000/invoices').status)"
+
+      - name: Graceful shutdown
+        run: |
+          start=$(date +%s)
+          docker stop --time 30 invoiceiq
+          echo "stopped in $(( $(date +%s) - start ))s"
+          test "$(docker inspect -f '{{.State.ExitCode}}' invoiceiq)" = "0"
+
+      - name: Container logs
+        if: always()
+        run: docker logs invoiceiq 2>&1 | tail -50 || true

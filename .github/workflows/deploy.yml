@@ -1,0 +1,95 @@
+# Deploy a new image to the existing Azure Container App.
+#
+# DISABLED until reviewed. To enable, after `terraform apply` has been approved and run:
+#   1. Repository variables (Settings → Variables; these are identifiers, not secrets):
+#        DEPLOY_ENABLED=true, AZURE_CLIENT_ID (terraform output github_deployer_client_id),
+#        AZURE_TENANT_ID, AZURE_SUBSCRIPTION_ID, AZURE_RESOURCE_GROUP, AZURE_CONTAINER_APP
+#   2. A GitHub environment named "production" with required reviewers.
+#   3. Make the GHCR package public (the app pulls it without registry credentials).
+# Infrastructure changes are applied with Terraform by a person, never by this workflow.
+
+name: Deploy
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'Type "deploy" to confirm a production deployment'
+        required: true
+
+permissions: {}
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Build and push image
+    if: vars.DEPLOY_ENABLED == 'true' && inputs.confirm == 'deploy'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      image: ${{ steps.meta.outputs.image }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - id: meta
+        name: Image name
+        run: |
+          owner="$(echo "${GITHUB_REPOSITORY_OWNER}" | tr '[:upper:]' '[:lower:]')"
+          echo "image=ghcr.io/${owner}/invoiceiq:${GITHUB_SHA}" >> "$GITHUB_OUTPUT"
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.image }}
+          provenance: true
+          sbom: true
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  deploy:
+    name: Update container app
+    needs: build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    environment: production # required reviewers gate this job
+    permissions:
+      id-token: write # OIDC token for Azure; no client secret exists
+      contents: read
+    steps:
+      - uses: azure/login@v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Deploy image
+        env:
+          IMAGE: ${{ needs.build.outputs.image }}
+          RG: ${{ vars.AZURE_RESOURCE_GROUP }}
+          APP: ${{ vars.AZURE_CONTAINER_APP }}
+        run: |
+          az containerapp update --name "$APP" --resource-group "$RG" --image "$IMAGE" \
+            --only-show-errors --output none
+          fqdn="$(az containerapp show --name "$APP" --resource-group "$RG" \
+            --query properties.configuration.ingress.fqdn --output tsv)"
+          echo "url=https://${fqdn}" >> "$GITHUB_STEP_SUMMARY"
+          for i in $(seq 1 20); do
+            curl -fsS -m 10 "https://${fqdn}/_stcore/health" && exit 0
+            sleep 15
+          done
+          echo "Health check failed after deployment" >&2; exit 1

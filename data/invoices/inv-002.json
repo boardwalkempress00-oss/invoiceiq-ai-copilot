@@ -1,0 +1,30 @@
+{
+  "invoice_id": "inv-002",
+  "invoice_number": "FBC-2026-0187",
+  "vendor": {
+    "name": "Fjordbyte Consulting A/S",
+    "vat_number": "DEMO-VAT-0002",
+    "country": "DK",
+    "email": "billing@fjordbyte.example"
+  },
+  "buyer": {
+    "name": "Aurora Nordic Trading ApS",
+    "country": "DK",
+    "cost_center": "CC-340 IT Infrastructure"
+  },
+  "issue_date": "2026-09-15",
+  "due_date": "2026-10-15",
+  "currency": "DKK",
+  "purchase_order": "PO-55107",
+  "line_items": [
+    {"line_id": "1", "description": "Cloud migration assessment, senior consultant (hours)", "quantity": "24", "unit_price": "1150.00", "line_total": "27600.00"},
+    {"line_id": "2", "description": "Security baseline review (hours)", "quantity": "8", "unit_price": "1250.00", "line_total": "10000.00"},
+    {"line_id": "3", "description": "Architecture workshop facilitation, half day", "quantity": "1", "unit_price": "4500.00", "line_total": "4500.00"}
+  ],
+  "subtotal": "42100.00",
+  "vat_rate": "0.25",
+  "vat_amount": "10525.00",
+  "total": "52625.00",
+  "approval": null,
+  "notes": "Fictional demo invoice: correct arithmetic, above the manager approval threshold, no approval recorded."
+}

@@ -1,0 +1,35 @@
+# Local container run. Mock AI, no Azure credentials needed.
+#   docker compose up --build            → http://localhost:8501
+#
+# Optional: persistent usage limiter against Azurite (the local Azure Storage emulator):
+#   docker compose --profile azurite up --build
+#   with USAGE_STORE=azure_table and AZURE_TABLE_CONNECTION_STRING set in .env (see .env.example)
+
+services:
+  invoiceiq:
+    build: .
+    image: invoiceiq:local
+    ports:
+      - "127.0.0.1:8501:8501"   # only Streamlit is published; FastAPI stays inside the container
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      APP_ENV: ${APP_ENV:-development}
+      AI_PROVIDER: ${AI_PROVIDER:-mock}
+      USAGE_STORE: ${USAGE_STORE:-memory}
+    read_only: true
+    tmpfs:
+      - /tmp:uid=10001,gid=10001,mode=1777
+      - /home/app:uid=10001,gid=10001,mode=0700
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    restart: unless-stopped
+    stop_grace_period: 30s
+
+  azurite:
+    image: mcr.microsoft.com/azure-storage/azurite:3.35.0
+    profiles: ["azurite"]
+    command: azurite-table --tableHost 0.0.0.0 --tablePort 10002 --skipApiVersionCheck --loose
+    ports:
+      - "127.0.0.1:10002:10002"
