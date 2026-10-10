@@ -108,7 +108,7 @@ read-only mode that still shows the verified validation results.
 | Retrieval | BM25, implemented in ~100 lines (no vector DB) |
 | Usage limiting | Azure Table Storage with ETag optimistic concurrency; SQLite/in-memory for local dev |
 | Container | Multi-stage Dockerfile, `tini` + Python supervisor, non-root |
-| Infrastructure | Terraform (AzureRM 4.81): Container Apps, Azure OpenAI, Storage, Log Analytics, managed identity |
+| Infrastructure | Terraform (AzureRM 4.81 + AzAPI 2.13): Container Apps, Azure OpenAI, Storage, Log Analytics, managed identity |
 | CI/CD | GitHub Actions: ruff, pytest + Azurite, Terraform test, Docker smoke test; OIDC deploy (disabled) |
 | Quality | pytest (282 tests, 95% coverage), ruff, `terraform test` with mocked providers |
 
@@ -177,9 +177,10 @@ docker compose --profile azurite up --build
 > [docs/deployment-readiness.md](docs/deployment-readiness.md) first.
 
 Terraform in [infra/terraform](infra/terraform) creates: resource group, Log Analytics
-workspace, consumption-only Container Apps environment, the container app (0–1 replicas,
+workspace, a Container Apps environment with only the serverless *Consumption* profile, the container app (0–1 replicas,
 0.5 vCPU / 1 GiB, HTTPS ingress on 8501), Azure OpenAI account + model deployment (API keys
-disabled), storage account + `aiusage` table (shared keys disabled), a user-assigned managed
+disabled), storage account (shared keys disabled) + `aiusage` table created through Azure Resource
+Manager via AzAPI (no shared-key ACL call), a user-assigned managed
 identity with two least-privilege role assignments, and optionally a budget alert and a GitHub
 OIDC deploy identity.
 
@@ -245,7 +246,7 @@ mocked providers).
 | API | 29 | All endpoints, error envelopes, correlation IDs, read-only modes |
 | Frontend | 47 | Presentation logic, API client, every Streamlit page via `AppTest` against the real API |
 | Integration | 40 | Usage-store contract on memory, SQLite and **Azure Table (Azurite)**: ETags, atomic multi-row commits, concurrency across separate clients, budgets, day rollover, fail-closed |
-| Terraform | 8 | Plan tests with mocked providers: scaling, sizes, HTTPS-only, keys disabled, no secrets, OIDC scope, no provisioned throughput |
+| Terraform | 9 | Plan tests with mocked providers: scaling, sizes, Consumption-only profile, HTTPS-only, keys disabled, table without ACLs, no secrets, OIDC scope, no provisioned throughput |
 
 ```bash
 uv run pytest --cov=invoiceiq        # 282 passed, 95% line coverage

@@ -10,6 +10,10 @@ terraform {
       source  = "hashicorp/random"
       version = "~> 3.6"
     }
+    azapi = {
+      source  = "Azure/azapi"
+      version = "~> 2.13"
+    }
   }
 
   # State is local by default (single maintainer). State contains resource IDs and the Azure
@@ -27,4 +31,11 @@ provider "azurerm" {
   # Microsoft.App, Microsoft.CognitiveServices, Microsoft.Storage, Microsoft.OperationalInsights,
   # Microsoft.ManagedIdentity, Microsoft.Authorization and Microsoft.Consumption.
   resource_provider_registrations = "none"
+}
+
+# AzAPI calls Azure Resource Manager directly. Used for the usage table, which must be created
+# through the management plane only (see main.tf). Same subscription, same registration policy.
+provider "azapi" {
+  subscription_id            = var.subscription_id
+  skip_provider_registration = true
 }

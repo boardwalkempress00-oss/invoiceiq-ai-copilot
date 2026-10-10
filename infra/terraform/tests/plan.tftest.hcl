@@ -3,8 +3,11 @@
 
 mock_provider "azurerm" {}
 mock_provider "random" {}
+mock_provider "azapi" {}
 
 variables {
+  # Explicit, so a local terraform.tfvars cannot turn on the one-time table import in tests.
+  usage_table_import_id  = null
   container_image        = "ghcr.io/example/invoiceiq:0123abc"
   openai_model_name      = "example-model"
   openai_model_version   = "2025-01-01"
@@ -31,8 +34,15 @@ run "cost_and_scaling_settings" {
   }
 
   assert {
-    condition     = length(azurerm_container_app_environment.main.workload_profile) == 0
-    error_message = "Environment must be consumption-only (no dedicated workload profiles)."
+    condition = length(azurerm_container_app_environment.main.workload_profile) == 1 && alltrue([
+      for p in azurerm_container_app_environment.main.workload_profile : p.workload_profile_type == "Consumption"
+    ])
+    error_message = "Only the serverless Consumption profile is allowed (Dedicated profiles add a fixed fee)."
+  }
+
+  assert {
+    condition     = azurerm_container_app.app.workload_profile_name == "Consumption"
+    error_message = "The app must run on the Consumption profile."
   }
 
   assert {
@@ -87,6 +97,23 @@ run "ingress_and_identity_security" {
   assert {
     condition     = azurerm_role_assignment.app_table_data.role_definition_name == "Storage Table Data Contributor"
     error_message = "The app identity needs table data access only."
+  }
+
+  assert {
+    condition     = azapi_resource.usage_table.type == "Microsoft.Storage/storageAccounts/tableServices/tables@2023-05-01" && azapi_resource.usage_table.name == "aiusage"
+    error_message = "The usage table must be created through Azure Resource Manager (management plane)."
+  }
+
+  assert {
+    condition     = length(azapi_resource.usage_table.body.properties.signedIdentifiers) == 0
+    error_message = "The usage table must not define stored access policies (ACLs); access is RBAC only."
+  }
+
+  assert {
+    condition = contains([
+      for e in azurerm_container_app.app.template[0].container[0].env : "${e.name}=${e.value}"
+    ], "AZURE_TABLE_NAME=aiusage")
+    error_message = "The app must use the aiusage table."
   }
 
   assert {
@@ -178,4 +205,14 @@ run "rejects_provisioned_throughput" {
   }
 
   expect_failures = [var.openai_deployment_sku]
+}
+
+run "rejects_malformed_table_import_id" {
+  command = plan
+
+  variables {
+    usage_table_import_id = "/subscriptions/x/resourceGroups/rg/providers/Microsoft.Storage/storageAccounts/st/tableServices/default/tables/other"
+  }
+
+  expect_failures = [var.usage_table_import_id]
 }

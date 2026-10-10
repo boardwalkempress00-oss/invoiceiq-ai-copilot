@@ -98,13 +98,23 @@ resource "azurerm_storage_account" "usage" {
   tags                            = var.tags
 }
 
-resource "azurerm_storage_table" "usage" {
-  name               = "aiusage"
-  storage_account_id = azurerm_storage_account.usage.id
+# Created through Azure Resource Manager (management plane) only. `azurerm_storage_table` also
+# calls the data-plane "Set Table ACL" operation, which the provider signs with a shared key —
+# refused here because shared-key access is disabled. The empty body sets no stored access
+# policies (ACLs); access is granted solely through the RBAC role assignment below.
+resource "azapi_resource" "usage_table" {
+  type      = "Microsoft.Storage/storageAccounts/tableServices/tables@2023-05-01"
+  name      = "aiusage"
+  parent_id = "${azurerm_storage_account.usage.id}/tableServices/default"
+  body = {
+    properties = {
+      signedIdentifiers = [] # explicitly no stored access policies
+    }
+  }
 }
 
 resource "azurerm_role_assignment" "app_table_data" {
-  scope                = azurerm_storage_table.usage.resource_manager_id # this table only
+  scope                = azapi_resource.usage_table.id # this table only
   role_definition_name = "Storage Table Data Contributor"
   principal_id         = azurerm_user_assigned_identity.app.principal_id
   principal_type       = "ServicePrincipal"
@@ -118,8 +128,15 @@ resource "azurerm_container_app_environment" "main" {
   resource_group_name        = azurerm_resource_group.main.name
   logs_destination           = "log-analytics"
   log_analytics_workspace_id = azurerm_log_analytics_workspace.main.id
-  # No workload_profile block: consumption-only environment, billed per use.
-  tags = var.tags
+  tags                       = var.tags
+
+  # Azure creates new environments with the serverless "Consumption" workload profile. It is
+  # billed per use with no management fee (that fee applies only to Dedicated profiles, which
+  # must never be added here — see tests). Declared so Terraform does not try to remove it.
+  workload_profile {
+    name                  = "Consumption"
+    workload_profile_type = "Consumption"
+  }
 }
 
 locals {
@@ -132,7 +149,7 @@ locals {
     AZURE_CLIENT_ID            = azurerm_user_assigned_identity.app.client_id # selects the identity
     USAGE_STORE                = "azure_table"
     AZURE_TABLE_ENDPOINT       = azurerm_storage_account.usage.primary_table_endpoint
-    AZURE_TABLE_NAME           = azurerm_storage_table.usage.name
+    AZURE_TABLE_NAME           = azapi_resource.usage_table.name
     AI_PRICE_INPUT_PER_1M      = var.ai_price_input_per_1m
     AI_PRICE_OUTPUT_PER_1M     = var.ai_price_output_per_1m
     AI_PRICE_CURRENCY          = var.ai_price_currency
@@ -147,6 +164,7 @@ resource "azurerm_container_app" "app" {
   resource_group_name          = azurerm_resource_group.main.name
   container_app_environment_id = azurerm_container_app_environment.main.id
   revision_mode                = "Single"
+  workload_profile_name        = "Consumption"
   max_inactive_revisions       = 2
   tags                         = var.tags
 

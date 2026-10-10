@@ -23,9 +23,9 @@ Azurite emulator, not against Azure.
 | 6 | Azure OpenAI model deployment | `chat` | Pay-per-token only (GlobalStandard default); model/version you choose; 10K TPM default |
 | 7 | Role assignment | — | *Cognitive Services OpenAI User* → identity, on the AI account |
 | 8 | Storage account (Standard LRS, StorageV2) | `stinvoiceiq<sfx>` | Shared keys disabled, TLS 1.2, no public blobs |
-| 9 | Storage table | `aiusage` | Usage-limiter counters |
+| 9 | Storage table (`azapi_resource`) | `aiusage` | Usage-limiter counters; created via Azure Resource Manager, no stored access policies |
 | 10 | Role assignment | — | *Storage Table Data Contributor* → identity, on that one table |
-| 11 | Container Apps environment (consumption-only) | `cae-invoiceiq-<sfx>` | No workload profiles, no VNet, no private endpoints |
+| 11 | Container Apps environment | `cae-invoiceiq-<sfx>` | Only the serverless *Consumption* workload profile (no Dedicated profiles), no VNet, no private endpoints |
 | 12 | Container app | `ca-invoiceiq-<sfx>` | 0–1 replicas, 0.5 vCPU / 1 GiB, HTTPS ingress → 8501 |
 | 13 | Consumption budget *(optional)* | `budget-invoiceiq-<sfx>` | Only if `budget_alert_email` is set; e-mail alerts at 50% actual / 100% forecast |
 | 14–17 | GitHub deploy identity, federated credential, 2 role assignments *(optional)* | `id-invoiceiq-<sfx>-deploy` | Only if `github_repository` is set; *Contributor* on the container app, *Reader* on the RG |
@@ -43,7 +43,7 @@ resource group.
 
 - Container Apps: Microsoft's billing documentation states the plan-management charge applies
   only with a **dedicated workload profile**, or features such as **private endpoints** or
-  **planned maintenance**. None is configured (a Terraform test blocks workload profiles). If one
+  **planned maintenance**. None is configured (a Terraform test allows only the free Consumption profile). If one
   were added, the "Environment Management Hour" meter is **$0.13/hour ≈ $95/month**.
 - Azure OpenAI S0 account and Standard/GlobalStandard deployments have no hosting fee.
   Provisioned (PTU) and fine-tuned deployments do — both are prevented (Terraform validation /
@@ -136,7 +136,7 @@ independent cap. TPM quota is *not* relied on for cost.
 | Providers (locked, linux_amd64 + darwin hashes) | azurerm **4.81.0**, random 3.9.1 |
 | `terraform fmt -check -recursive` | ✅ pass |
 | `terraform validate` | ✅ "The configuration is valid." |
-| `terraform test` (mocked providers, plan only) | ✅ **8 passed, 0 failed** — replicas 0–1, 0.5 vCPU/1 GiB, consumption-only env, log caps, Standard LRS, HTTPS-only ingress on 8501, AI keys and storage keys disabled, least-privilege roles, no secrets/registry credentials, `USAGE_STORE=azure_table`, OIDC subject scoped to the protected environment, rejects `:latest`, zero prices and provisioned throughput |
+| `terraform test` (mocked providers, plan only) | ✅ **9 passed, 0 failed** — replicas 0–1, 0.5 vCPU/1 GiB, Consumption profile only, table without ACLs, log caps, Standard LRS, HTTPS-only ingress on 8501, AI keys and storage keys disabled, least-privilege roles, no secrets/registry credentials, `USAGE_STORE=azure_table`, OIDC subject scoped to the protected environment, rejects `:latest`, zero prices and provisioned throughput |
 | Negative check | Changing `min_replicas` to 1 makes the test fail as intended |
 | Not yet done | A real `terraform plan` (needs Azure credentials and your approval). It will surface region/model availability, quota and name collisions |
 
@@ -197,3 +197,18 @@ with explicit approval.
 **Sources:** Azure Retail Prices API (`prices.azure.com`, Sweden Central, USD, 2026-10-10);
 [Billing in Azure Container Apps](https://learn.microsoft.com/en-us/azure/container-apps/billing)
 (Microsoft Learn, updated 2026-03-25).
+
+## Deployment log
+
+**2026-10-10 — first apply (partial).** 10 of 13 planned items were created. `azurerm_storage_table`
+created the `aiusage` table through Azure Resource Manager, then failed on its data-plane
+*Set Table ACL* call, which the provider signs with a shared key (refused: shared-key access is
+disabled by design). No permissions or security settings were changed.
+
+**Fix (approved).** The table is now an `azapi_resource` (Azure/azapi 2.13), created and read
+through Azure Resource Manager only, with no stored access policies. The existing table was
+removed from state (`terraform state rm`, not deleted in Azure) and adopted with a one-time,
+variable-gated `import` block (`infra/terraform/migrations.tf`). The re-plan also revealed that
+Azure now creates Container Apps environments with a serverless `Consumption` workload profile;
+it is declared in code so Terraform does not try to remove it (it carries no management fee).
+Resulting plan: 1 import, 2 creates, 0 changes, 0 destroys.
