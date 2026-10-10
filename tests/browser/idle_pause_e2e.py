@@ -219,6 +219,18 @@ with sync_playwright() as p:
     )
     picked = pg.get_by_role("combobox").first.evaluate("(e) => e.value")
     ok("5e. selected invoice restored", picked.startswith("KFS-2026-0203"), picked)
+    pg.get_by_role("button", name="Explain this invoice.").click()
+    pg.wait_for_function(
+        "() => document.querySelectorAll('[data-testid=stChatMessage]').length >= 4", timeout=30000
+    )
+    pg.wait_for_timeout(1500)
+    picked_after = pg.get_by_role("combobox").first.evaluate("(e) => e.value")
+    n_msgs = pg.locator("[data-testid=stChatMessage]").count()
+    ok(
+        "5g. follow-up after resume stays on the restored invoice",
+        picked_after.startswith("KFS-2026-0203") and n_msgs == 4,
+        f"{picked_after[:13]}, {n_msgs} messages",
+    )
     ctx.close()
 
     # 5f. Regression: a click right after a fresh page load must not be lost (no restore rerun).

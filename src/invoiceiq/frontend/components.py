@@ -107,6 +107,9 @@ def backend_error(error: ApiError) -> None:
     st.error(f"{error.message}{ref}", icon=":material/error:")
 
 
+PICKER_GENERATION_KEY = "_invoice_picker_generation"
+
+
 def invoice_selector(invoices: list[dict[str, Any]], key: str) -> str:
     """Invoice picker kept in sync across pages through session state."""
     ids = [inv["invoice_id"] for inv in invoices]
@@ -117,7 +120,13 @@ def invoice_selector(invoices: list[dict[str, Any]], key: str) -> str:
     }
     current = state.selected_invoice(ids[0])
     index = ids.index(current) if current in ids else 0
-    chosen = st.selectbox("Invoice", ids, index=index, format_func=labels.__getitem__, key=key)
+    # After a history restore the selection changes server-side; a new widget identity makes the
+    # browser show it (a widget keeps its own client-side value for an unchanged key).
+    generation = st.session_state.get(PICKER_GENERATION_KEY, 0)
+    widget_key = key if not generation else f"{key}-{generation}"
+    chosen = st.selectbox(
+        "Invoice", ids, index=index, format_func=labels.__getitem__, key=widget_key
+    )
     state.select_invoice(chosen)
     return chosen
 

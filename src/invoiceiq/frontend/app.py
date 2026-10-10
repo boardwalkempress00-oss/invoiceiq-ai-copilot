@@ -65,9 +65,9 @@ if restored:
             if not current.get(invoice_id):  # fill empty conversations; never overwrite new ones
                 current[invoice_id] = messages
         if selected and fresh_session:
-            # Return to the invoice that was open. The picker keeps its own widget value, so
-            # clear it and let it re-initialise from the restored selection.
+            # Return to the invoice that was open (the picker re-creates itself, see components).
             state.select_invoice(selected)
-            st.session_state.pop("invoice_picker", None)
+            generation = st.session_state.get(components.PICKER_GENERATION_KEY, 0) + 1
+            st.session_state[components.PICKER_GENERATION_KEY] = generation
 
 navigation.run()
