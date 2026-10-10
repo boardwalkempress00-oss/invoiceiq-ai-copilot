@@ -208,7 +208,10 @@ disabled by design). No permissions or security settings were changed.
 **Fix (approved).** The table is now an `azapi_resource` (Azure/azapi 2.13), created and read
 through Azure Resource Manager only, with no stored access policies. The existing table was
 removed from state (`terraform state rm`, not deleted in Azure) and adopted with a one-time,
-variable-gated `import` block (`infra/terraform/migrations.tf`). The re-plan also revealed that
+variable-gated `import` block, which was deleted after the import was applied. The re-plan also revealed that
 Azure now creates Container Apps environments with a serverless `Consumption` workload profile;
 it is declared in code so Terraform does not try to remove it (it carries no management fee).
 Resulting plan: 1 import, 2 creates, 0 changes, 0 destroys.
+
+**2026-10-10 — second apply.** `1 imported, 2 added, 0 changed, 0 destroyed`. A follow-up plan
+reports no changes. App URL: https://ca-invoiceiq-dbmr0.bravewater-5e6a1283.swedencentral.azurecontainerapps.io

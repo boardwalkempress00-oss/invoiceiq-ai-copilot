@@ -6,8 +6,6 @@ mock_provider "random" {}
 mock_provider "azapi" {}
 
 variables {
-  # Explicit, so a local terraform.tfvars cannot turn on the one-time table import in tests.
-  usage_table_import_id  = null
   container_image        = "ghcr.io/example/invoiceiq:0123abc"
   openai_model_name      = "example-model"
   openai_model_version   = "2025-01-01"
@@ -205,14 +203,4 @@ run "rejects_provisioned_throughput" {
   }
 
   expect_failures = [var.openai_deployment_sku]
-}
-
-run "rejects_malformed_table_import_id" {
-  command = plan
-
-  variables {
-    usage_table_import_id = "/subscriptions/x/resourceGroups/rg/providers/Microsoft.Storage/storageAccounts/st/tableServices/default/tables/other"
-  }
-
-  expect_failures = [var.usage_table_import_id]
 }
