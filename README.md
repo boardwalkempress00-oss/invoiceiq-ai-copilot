@@ -127,6 +127,7 @@ read-only mode that still shows the verified validation results.
 | Terraform | ✅ Written, validated and plan-tested — **not applied** |
 | CI workflow | ✅ Written and linted (`actionlint`) — runs once pushed to GitHub |
 | Deploy workflow (OIDC) | ✅ Written — **disabled** until credentials are reviewed |
+| Publish-image workflow (GHCR) | ✅ Manual; publishes only commits whose CI passed |
 | Event Grid, Service Bus, Blob ingestion, background worker | ⏳ Planned (Milestone 2) |
 | Azure AI Search, Document Intelligence, authentication | ⏳ Planned (later milestones) |
 
@@ -188,7 +189,8 @@ OIDC deploy identity.
      --query "[?model.name=='<model>'].{version:model.version, skus:model.skus[].name}" -o table
    az cognitiveservices usage list -l swedencentral -o table
    ```
-2. **Publish the image** to a public registry (e.g. GHCR) with an immutable tag.
+2. **Publish the image** with the manual *Publish image* workflow (GHCR, amd64 + arm64, full-SHA tag,
+   only for commits whose CI passed) and copy the digest from the run summary.
 3. `cp infra/terraform/terraform.tfvars.example infra/terraform/terraform.tfvars` and fill in the
    image, model, version and **real token prices** (Terraform refuses zero prices — the daily cost
    budget depends on them).

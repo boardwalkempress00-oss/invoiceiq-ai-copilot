@@ -4,7 +4,8 @@
 location        = "swedencentral"
 # openai_location = "swedencentral"   # only if the model is unavailable in `location`
 
-container_image = "ghcr.io/<github-owner>/invoiceiq:<git-sha>"
+# Digest from the "Publish image" workflow run summary.
+container_image = "ghcr.io/<github-owner>/invoiceiq-ai-copilot@sha256:<digest>"
 
 # VERIFY before applying — availability and versions change:
 #   az cognitiveservices model list -l swedencentral \

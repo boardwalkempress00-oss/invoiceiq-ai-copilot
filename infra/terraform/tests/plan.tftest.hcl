@@ -15,6 +15,11 @@ variables {
 run "cost_and_scaling_settings" {
   command = plan
 
+  # Explicit, so a local terraform.tfvars (which `terraform test` also loads) cannot change it.
+  variables {
+    budget_alert_email = null
+  }
+
   assert {
     condition     = azurerm_container_app.app.template[0].min_replicas == 0 && azurerm_container_app.app.template[0].max_replicas == 1
     error_message = "The app must scale to zero and never above one replica."

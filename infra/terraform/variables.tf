@@ -42,7 +42,7 @@ variable "tags" {
 # --- Container -------------------------------------------------------------------------------
 
 variable "container_image" {
-  description = "Public container image, e.g. ghcr.io/<owner>/invoiceiq:<git-sha>. Pin a tag or digest."
+  description = "Public container image, e.g. ghcr.io/<owner>/invoiceiq-ai-copilot@sha256:<digest>. Pin a digest or SHA tag."
   type        = string
 
   validation {
