@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex">
+  <title>InvoiceIQ — Session paused</title>
+  <style>
+    :root { --navy: #14324f; --blue: #1f5f99; --ink: #1b2430; --muted: #5b6676; --bg: #f5f7fa; }
+    body { margin: 0; min-height: 100vh; display: grid; place-items: center; background: var(--bg);
+           font: 16px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; color: var(--ink); }
+    main { background: #fff; border: 1px solid #e3e8ef; border-radius: 14px; padding: 36px 40px;
+           max-width: 460px; margin: 16px; text-align: center; box-shadow: 0 4px 20px rgba(20,50,79,.08); }
+    h1 { font-size: 1.5rem; margin: 0 0 .5rem; color: var(--navy); }
+    p { color: var(--muted); margin: 0 0 1.5rem; }
+    a.button { display: inline-block; background: var(--blue); color: #fff; text-decoration: none;
+               padding: 10px 22px; border-radius: 8px; font-weight: 600; }
+    a.button:focus-visible { outline: 3px solid #9cc3e8; outline-offset: 2px; }
+    small { display: block; margin-top: 1.25rem; color: var(--muted); }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Session paused</h1>
+    <p>InvoiceIQ paused this session after a period of inactivity, so the demo can scale down
+       and stay inexpensive. Your conversation in this tab is kept.</p>
+    <a class="button" id="resume" href="/">Resume</a>
+    <small>Fictional demo data · nothing is lost by pausing</small>
+  </main>
+  <script>
+    // Return to the page that was open, but only to a known app route (never an arbitrary URL).
+    try {
+      var path = sessionStorage.getItem("invoiceiq.resume.path");
+      if (path && /^\/(analysis|chat|architecture|observability)?$/.test(path)) {
+        document.getElementById("resume").setAttribute("href", path);
+      }
+    } catch (e) {}
+  </script>
+</body>
+</html>

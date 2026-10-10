@@ -33,6 +33,7 @@ packages = ["src/invoiceiq"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+norecursedirs = ["tests/browser"]  # manual browser checks (see tests/browser/)
 addopts = "-ra --strict-markers"
 filterwarnings = [
     # Frontend tests route the real ApiClient through Starlette's TestClient, which warns about
@@ -48,3 +49,7 @@ src = ["src", "tests"]
 [tool.ruff.lint]
 select = ["E", "F", "I", "B", "UP", "SIM", "RUF"]
 ignore = ["RUF001", "RUF002", "RUF003"]  # allow typographic characters (—, ×) in text
+
+[tool.ruff.lint.per-file-ignores]
+# Manual browser test script: long assertion messages and terse loop variables are fine.
+"tests/browser/*" = ["E501", "E741"]

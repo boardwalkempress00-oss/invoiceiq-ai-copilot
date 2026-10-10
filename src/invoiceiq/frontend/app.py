@@ -8,7 +8,8 @@ from __future__ import annotations
 
 import streamlit as st
 
-from invoiceiq.frontend import components, state
+from invoiceiq.frontend import components, idle_pause, state
+from invoiceiq.frontend.api_client import ApiError
 from invoiceiq.frontend.presentation import ai_mode
 
 st.set_page_config(
@@ -45,5 +46,28 @@ with st.sidebar:
         "Portfolio demo. All invoices, companies, people and policies are **fictional**. "
         "Not accounting, tax or legal advice."
     )
+    # Idle pause + per-tab chat history persistence (browser-side; see idle_pause.py).
+    restored = idle_pause.mount(
+        st.session_state.get("chats", {}), state.selected_invoice(), st.session_state
+    )
+
+if restored:
+    try:
+        valid_ids = {inv["invoice_id"] for inv in state.client().list_invoices()}
+    except ApiError:
+        valid_ids = set()
+    result = idle_pause.restore_history(restored, valid_ids)
+    if result is not None:
+        chats, selected = result
+        current = st.session_state.setdefault("chats", {})
+        fresh_session = not any(current.values())
+        for invoice_id, messages in chats.items():
+            if not current.get(invoice_id):  # fill empty conversations; never overwrite new ones
+                current[invoice_id] = messages
+        if selected and fresh_session:
+            # Return to the invoice that was open. The picker keeps its own widget value, so
+            # clear it and let it re-initialise from the restored selection.
+            state.select_invoice(selected)
+            st.session_state.pop("invoice_picker", None)
 
 navigation.run()

@@ -12,6 +12,8 @@ showErrorDetails = "none"
 
 [server]
 headless = true
+# Serves frontend/static/ at /app/static/ (only the "Session paused" page lives there).
+enableStaticServing = true
 maxUploadSize = 1
 
 [browser]
