@@ -29,7 +29,8 @@ provider "azurerm" {
   # Never register resource providers implicitly (that is a subscription-wide change, and the
   # provider would do it even during `plan`). Required providers are registered deliberately:
   # Microsoft.App, Microsoft.CognitiveServices, Microsoft.Storage, Microsoft.OperationalInsights,
-  # Microsoft.ManagedIdentity, Microsoft.Authorization and Microsoft.Consumption.
+  # Microsoft.ManagedIdentity, Microsoft.Authorization and Microsoft.Consumption — plus
+  # Microsoft.ServiceBus and Microsoft.EventGrid when event_processing_enabled = true.
   resource_provider_registrations = "none"
 }
 
