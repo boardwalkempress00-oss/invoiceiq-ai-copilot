@@ -2,10 +2,13 @@
 
 from __future__ import annotations
 
+from datetime import datetime
 from decimal import Decimal
-from typing import Literal
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
+
+from invoiceiq.core.models import ValidationResult
 
 INVOICE_ID_PATTERN = r"^[a-z0-9-]{1,40}$"
 SESSION_ID_PATTERN = r"^[A-Za-z0-9_-]{8,64}$"
@@ -63,6 +66,9 @@ class HealthResponse(_Schema):
     version: str
     environment: str
     ai: AIStatus
+    async_processing: bool = Field(
+        default=False, description="True when invoice upload and asynchronous processing is on."
+    )
 
 
 class PolicySectionOut(_Schema):
@@ -127,3 +133,53 @@ class ChatResponse(_Schema):
     timings: TimingsOut
     limits: LimitsOut
     correlation_id: str
+
+
+# --- Asynchronous invoice processing -------------------------------------------------------------
+
+
+class SubmissionRequest(_Schema):
+    session_id: str = Field(
+        pattern=SESSION_ID_PATTERN,
+        description="Opaque per-browser-session identifier used for the upload allowance.",
+    )
+    sample_invoice_id: str | None = Field(default=None, pattern=INVOICE_ID_PATTERN)
+    # Hard upper bound here; the configurable byte limit is enforced by the service.
+    content: str | None = Field(default=None, max_length=300_000)
+
+
+class SubmissionErrorOut(_Schema):
+    code: str
+    message: str
+    details: list[str] = Field(default_factory=list)
+
+
+class TimelineStepOut(_Schema):
+    step: str
+    at: datetime | None
+
+
+class SubmissionOut(_Schema):
+    submission_id: str
+    status: str
+    display_status: str = Field(description="Status, or 'Stalled' when progress has stopped.")
+    terminal: bool
+    source: str
+    sample_invoice_id: str | None
+    attempts: int
+    size_bytes: int
+    created_at: datetime
+    updated_at: datetime
+    queued_at: datetime | None
+    started_at: datetime | None
+    finished_at: datetime | None
+    invoice_id: str | None
+    invoice_number: str | None
+    correlation_id: str
+    error: SubmissionErrorOut | None
+    timeline: list[TimelineStepOut]
+    invoice: dict[str, Any] | None = None
+    result: ValidationResult | None = None
+    poll_after_ms: int | None = Field(
+        description="Suggested delay before checking again; null once the status is final."
+    )

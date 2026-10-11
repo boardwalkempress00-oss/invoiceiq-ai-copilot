@@ -28,6 +28,7 @@ from invoiceiq.configuration import Settings
 from invoiceiq.core.invoice_service import InvoiceService
 from invoiceiq.core.models import Invoice, InvoiceSummary, ValidationResult
 from invoiceiq.logging_config import correlation_id_var
+from invoiceiq.processing.submissions import SubmissionService
 
 
 @dataclass(frozen=True)
@@ -35,6 +36,8 @@ class AppContainer:
     settings: Settings
     invoice_service: InvoiceService
     chat_service: ChatService
+    # None unless ASYNC_PROCESSING_ENABLED is set (see submission_routes.py).
+    submission_service: SubmissionService | None = None
 
 
 class InputTooLongError(ValueError):
@@ -78,6 +81,7 @@ def health(container: Container) -> HealthResponse:
             block_reason=block.value if block else None,
             daily_requests_remaining=daily_remaining,
         ),
+        async_processing=container.submission_service is not None,
     )
 
 

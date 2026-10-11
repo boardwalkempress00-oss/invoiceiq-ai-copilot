@@ -17,7 +17,9 @@ from invoiceiq.ai.ai_service import ChatService
 from invoiceiq.ai.providers import ChatProvider, create_provider
 from invoiceiq.api.middleware import correlation_and_timing, error_response
 from invoiceiq.api.routes import AppContainer, InputTooLongError, router
-from invoiceiq.configuration import Settings, UsageStoreName, get_settings
+from invoiceiq.api.submission_routes import router as submission_router
+from invoiceiq.api.submission_routes import submission_error_response
+from invoiceiq.configuration import Settings, SubmissionBackend, UsageStoreName, get_settings
 from invoiceiq.core.invoice_service import (
     InvoiceNotFoundError,
     InvoiceService,
@@ -32,6 +34,7 @@ from invoiceiq.core.usage_limiter import (
     UsageStore,
 )
 from invoiceiq.logging_config import configure_logging
+from invoiceiq.processing.submissions import SubmissionError, SubmissionService
 
 logger = logging.getLogger(__name__)
 
@@ -54,11 +57,58 @@ def create_usage_store(settings: Settings) -> UsageStore:
     return InMemoryUsageStore()
 
 
+def create_submission_service(
+    settings: Settings, invoice_service: InvoiceService
+) -> SubmissionService | None:
+    """None when the feature is off. Independent of the chat service and its usage store."""
+    if not settings.async_processing_enabled:
+        return None
+    from invoiceiq.processing.processor import ProcessorConfig
+
+    if settings.submission_backend == SubmissionBackend.AZURE:
+        from invoiceiq.processing.azure_table_store import AzureTableSubmissionStore
+        from invoiceiq.processing.blobs import AzureBlobStore
+
+        try:
+            store = AzureTableSubmissionStore.from_settings(settings)
+            blobs = AzureBlobStore.from_settings(settings)
+            if settings.azure_table_connection_string is not None:
+                store.ensure_table()  # local Azurite convenience; Terraform creates them in Azure
+            if settings.azure_blob_connection_string is not None:
+                blobs.ensure_container()
+        except Exception as exc:
+            # Fail closed for this feature only; chat and validation keep working.
+            logger.error("submission_backend.unavailable", extra={"error": type(exc).__name__})
+            return None
+        return SubmissionService(settings, store, blobs, invoice_service)
+
+    from invoiceiq.processing.blobs import InMemoryBlobStore
+    from invoiceiq.processing.local_pipeline import LocalPipeline
+    from invoiceiq.processing.store import InMemorySubmissionStore
+
+    mem_store, mem_blobs = InMemorySubmissionStore(), InMemoryBlobStore()
+    pipeline = LocalPipeline(
+        mem_store,
+        mem_blobs,
+        ProcessorConfig(
+            container=settings.upload_container,
+            max_invoice_bytes=settings.submission_max_bytes,
+            lease_seconds=settings.worker_lease_seconds,
+            max_delivery_count=settings.worker_max_delivery_count,
+        ),
+        delay_seconds=settings.local_pipeline_delay_seconds,
+    )
+    return SubmissionService(
+        settings, mem_store, mem_blobs, invoice_service, on_uploaded=pipeline.on_uploaded
+    )
+
+
 def build_container(
     settings: Settings,
     *,
     provider: ChatProvider | None = None,
     usage_store: UsageStore | None = None,
+    submission_service: SubmissionService | None = None,
 ) -> AppContainer:
     invoice_service = InvoiceService(JsonInvoiceRepository(settings.invoices_dir))
     retriever = BM25PolicyRetriever.from_file(
@@ -77,7 +127,12 @@ def build_container(
         provider=provider or create_provider(settings),
         limiter=limiter,
     )
-    return AppContainer(settings, invoice_service, chat_service)
+    return AppContainer(
+        settings,
+        invoice_service,
+        chat_service,
+        submission_service or create_submission_service(settings, invoice_service),
+    )
 
 
 def create_app(
@@ -85,6 +140,7 @@ def create_app(
     *,
     provider: ChatProvider | None = None,
     usage_store: UsageStore | None = None,
+    submission_service: SubmissionService | None = None,
 ) -> FastAPI:
     settings = settings or get_settings()
     app = FastAPI(
@@ -92,9 +148,19 @@ def create_app(
         version=__version__,
         description="AI Finance Operations Copilot — fictional demo data only.",
     )
-    app.state.container = build_container(settings, provider=provider, usage_store=usage_store)
+    app.state.container = build_container(
+        settings,
+        provider=provider,
+        usage_store=usage_store,
+        submission_service=submission_service,
+    )
     app.middleware("http")(correlation_and_timing)
     app.include_router(router)
+    app.include_router(submission_router)
+
+    @app.exception_handler(SubmissionError)
+    async def _submission_error(_: Request, exc: SubmissionError) -> JSONResponse:
+        return submission_error_response(exc)
 
     @app.exception_handler(InvoiceNotFoundError)
     async def _not_found(_: Request, exc: InvoiceNotFoundError) -> JSONResponse:

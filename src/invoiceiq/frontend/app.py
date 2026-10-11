@@ -21,13 +21,16 @@ st.set_page_config(
 components.inject_css()
 
 P = components.PAGE_PATHS
+workspace = [
+    st.Page(P["dashboard"], title="Dashboard", icon=":material/dashboard:", default=True),
+    st.Page(P["analysis"], title="Invoice Analysis", icon=":material/fact_check:"),
+    st.Page(P["chat"], title="AI Chat", icon=":material/forum:"),
+]
+if (state.health() or {}).get("async_processing"):  # shown only when the backend enables it
+    workspace.append(st.Page(P["process"], title="Process Invoice", icon=":material/upload_file:"))
 navigation = st.navigation(
     {
-        "Workspace": [
-            st.Page(P["dashboard"], title="Dashboard", icon=":material/dashboard:", default=True),
-            st.Page(P["analysis"], title="Invoice Analysis", icon=":material/fact_check:"),
-            st.Page(P["chat"], title="AI Chat", icon=":material/forum:"),
-        ],
+        "Workspace": workspace,
         "About this project": [
             st.Page(P["architecture"], title="Architecture", icon=":material/account_tree:"),
             st.Page(P["observability"], title="Observability", icon=":material/monitoring:"),
