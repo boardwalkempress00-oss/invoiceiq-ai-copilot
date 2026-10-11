@@ -154,7 +154,7 @@ resource "azurerm_servicebus_queue" "invoice_events" {
   name                                 = local.queue_name
   namespace_id                         = azurerm_servicebus_namespace.main[0].id
   max_delivery_count                   = local.queue_max_delivery
-  lock_duration                        = "PT${local.queue_lock_seconds}S"
+  lock_duration                        = "PT1M" # = queue_lock_seconds; Azure normalises "PT60S" to "PT1M"
   default_message_ttl                  = "P1D"
   dead_lettering_on_message_expiration = true
   max_size_in_megabytes                = 1024
@@ -352,9 +352,11 @@ resource "azapi_resource" "worker_job" {
         triggerType       = "Event"
         replicaTimeout    = local.job_replica_timeout
         replicaRetryLimit = 0 # Service Bus redelivery is the retry mechanism
+        # Azure returns these IDs with a lower-case "resourcegroups" segment; sending the same
+        # form avoids a permanent (case-only) plan difference.
         identitySettings = [
-          { identity = azurerm_user_assigned_identity.scaler[0].id, lifecycle = "None" },
-          { identity = azurerm_user_assigned_identity.worker[0].id, lifecycle = "Main" },
+          { identity = replace(azurerm_user_assigned_identity.scaler[0].id, "resourceGroups/", "resourcegroups/"), lifecycle = "None" },
+          { identity = replace(azurerm_user_assigned_identity.worker[0].id, "resourceGroups/", "resourcegroups/"), lifecycle = "Main" },
         ]
         eventTriggerConfig = {
           parallelism            = 1
