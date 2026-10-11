@@ -77,11 +77,63 @@ resource "azurerm_storage_container" "invoice_uploads" {
   container_access_type = "private"
 }
 
+# LEGACY (unused): the first dead-letter container, in the main account. Event Grid refused it as
+# a managed-identity dead-letter destination with a container-scoped role (it requires the role on
+# the storage account — verified in infra/manual-tests). Kept so this change destroys nothing;
+# remove it and its role assignment in a separately approved clean-up.
 resource "azurerm_storage_container" "eventgrid_deadletter" {
   count                 = local.ep ? 1 : 0
   name                  = local.deadletter_container
   storage_account_id    = azurerm_storage_account.usage.id
   container_access_type = "private"
+}
+
+# Dedicated dead-letter account: Event Grid needs Storage Blob Data Contributor on the *account*
+# that receives dead-letters, so dead-letters get their own account. Event Grid's identity then has
+# no access to the main account (uploads, usage table).
+resource "azurerm_storage_account" "deadletter" {
+  count                           = local.ep ? 1 : 0
+  name                            = "stdl${var.name_prefix}${local.suffix}"
+  location                        = azurerm_resource_group.main.location
+  resource_group_name             = azurerm_resource_group.main.name
+  account_tier                    = "Standard"
+  account_replication_type        = "LRS"
+  account_kind                    = "StorageV2"
+  min_tls_version                 = "TLS1_2"
+  https_traffic_only_enabled      = true
+  shared_access_key_enabled       = false # Entra ID only
+  default_to_oauth_authentication = true
+  allow_nested_items_to_be_public = false
+  local_user_enabled              = false
+  tags                            = var.tags
+}
+
+resource "azurerm_storage_container" "deadletter" {
+  count                 = local.ep ? 1 : 0
+  name                  = local.deadletter_container
+  storage_account_id    = azurerm_storage_account.deadletter[0].id
+  container_access_type = "private"
+}
+
+resource "azurerm_storage_management_policy" "deadletter_retention" {
+  count              = local.ep ? 1 : 0
+  storage_account_id = azurerm_storage_account.deadletter[0].id
+
+  rule {
+    name    = "delete-eventgrid-deadletters"
+    enabled = true
+    filters {
+      blob_types   = ["blockBlob"]
+      prefix_match = ["${local.deadletter_container}/"]
+    }
+    actions {
+      base_blob {
+        delete_after_days_since_creation_greater_than = var.submission_retention_days
+      }
+    }
+  }
+
+  depends_on = [azurerm_storage_container.deadletter]
 }
 
 # Same pattern as the usage table: management plane only, no stored access policies.
@@ -225,15 +277,15 @@ resource "azurerm_eventgrid_system_topic_event_subscription" "blob_created" {
   }
 
   storage_blob_dead_letter_destination {
-    storage_account_id          = azurerm_storage_account.usage.id
-    storage_blob_container_name = local.deadletter_container
+    storage_account_id          = azurerm_storage_account.deadletter[0].id
+    storage_blob_container_name = azurerm_storage_container.deadletter[0].name
   }
 
   # Undeliverable events are retried for 24 h, so RBAC propagation delay right after creation
   # cannot lose events; the roles are still created first.
   depends_on = [
     azurerm_role_assignment.eventgrid_queue_sender,
-    azurerm_role_assignment.eventgrid_deadletter_writer,
+    azurerm_role_assignment.eventgrid_deadletter_account,
   ]
 }
 
@@ -315,9 +367,20 @@ resource "azurerm_role_assignment" "eventgrid_queue_sender" {
   principal_type       = "ServicePrincipal"
 }
 
+# LEGACY (unused, see the legacy container above).
 resource "azurerm_role_assignment" "eventgrid_deadletter_writer" {
   count                = local.ep ? 1 : 0
   scope                = azurerm_storage_container.eventgrid_deadletter[0].id
+  role_definition_name = "Storage Blob Data Contributor"
+  principal_id         = azurerm_eventgrid_system_topic.storage[0].identity[0].principal_id
+  principal_type       = "ServicePrincipal"
+}
+
+# Account scope is what Event Grid validates for managed-identity dead-lettering; the account
+# holds nothing but dead-letters.
+resource "azurerm_role_assignment" "eventgrid_deadletter_account" {
+  count                = local.ep ? 1 : 0
+  scope                = azurerm_storage_account.deadletter[0].id
   role_definition_name = "Storage Blob Data Contributor"
   principal_id         = azurerm_eventgrid_system_topic.storage[0].identity[0].principal_id
   principal_type       = "ServicePrincipal"

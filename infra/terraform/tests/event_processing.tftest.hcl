@@ -108,6 +108,20 @@ override_resource {
 }
 
 override_resource {
+  target = azurerm_storage_account.deadletter
+  values = {
+    id = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-test/providers/Microsoft.Storage/storageAccounts/stdltest"
+  }
+}
+
+override_resource {
+  target = azurerm_storage_container.deadletter
+  values = {
+    id = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-test/providers/Microsoft.Storage/storageAccounts/stdltest/blobServices/default/containers/eventgrid-deadletter"
+  }
+}
+
+override_resource {
   target = azurerm_servicebus_namespace.main
   values = {
     id = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-test/providers/Microsoft.ServiceBus/namespaces/sb-test"
@@ -258,6 +272,41 @@ run "enabled_infrastructure_is_least_privilege_and_cheap" {
       p.header_name == "CorrelationId" && p.type == "Dynamic" && p.source_field == "data.clientRequestId"
     ])
     error_message = "The API correlation ID must be carried into the Service Bus message."
+  }
+
+  # --- Dead-letters: dedicated account (Event Grid validates an account-scoped role) ---
+  assert {
+    condition = alltrue([
+      azurerm_eventgrid_system_topic_event_subscription.blob_created[0].storage_blob_dead_letter_destination[0].storage_account_id == azurerm_storage_account.deadletter[0].id,
+      azurerm_storage_account.deadletter[0].id != azurerm_storage_account.usage.id,
+      azurerm_role_assignment.eventgrid_deadletter_account[0].scope == azurerm_storage_account.deadletter[0].id,
+      azurerm_role_assignment.eventgrid_deadletter_account[0].role_definition_name == "Storage Blob Data Contributor",
+      azurerm_role_assignment.eventgrid_deadletter_account[0].principal_id == azurerm_eventgrid_system_topic.storage[0].identity[0].principal_id,
+    ])
+    error_message = "Dead-letters must go to the dedicated account, and Event Grid's account-scoped role must be on that account only."
+  }
+  assert {
+    condition = alltrue([
+      azurerm_storage_account.deadletter[0].shared_access_key_enabled == false,
+      azurerm_storage_account.deadletter[0].allow_nested_items_to_be_public == false,
+      azurerm_storage_account.deadletter[0].min_tls_version == "TLS1_2",
+      azurerm_storage_account.deadletter[0].account_replication_type == "LRS",
+      azurerm_storage_container.deadletter[0].container_access_type == "private",
+      azurerm_storage_management_policy.deadletter_retention[0].rule[0].actions[0].base_blob[0].delete_after_days_since_creation_greater_than == 7,
+    ])
+    error_message = "The dead-letter account must be Entra ID-only, private, cheapest tier, with 7-day retention."
+  }
+  assert {
+    condition = length([
+      for a in [
+        azurerm_role_assignment.app_uploads_writer[0], azurerm_role_assignment.app_jobs_table[0],
+        azurerm_role_assignment.worker_uploads_reader[0], azurerm_role_assignment.worker_jobs_table[0],
+        azurerm_role_assignment.worker_queue_receiver[0], azurerm_role_assignment.scaler_queue_owner[0],
+        azurerm_role_assignment.eventgrid_queue_sender[0], azurerm_role_assignment.eventgrid_deadletter_writer[0],
+        azurerm_role_assignment.eventgrid_deadletter_account[0],
+      ] : a if a.scope == azurerm_storage_account.usage.id
+    ]) == 0
+    error_message = "No role may be scoped to the whole main storage account."
   }
 
   # --- Role assignments: exact scope per identity ---
