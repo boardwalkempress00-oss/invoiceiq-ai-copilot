@@ -40,11 +40,14 @@ async def handler(req):
             ]
         )
         await ws_c.prepare(req)
-        async with aiohttp.ClientSession() as s, s.ws_connect(
-            UP.replace("http", "ws") + req.path_qs,
-            protocols=(ws_c.ws_protocol and [ws_c.ws_protocol]) or (),
-            max_msg_size=0,
-        ) as ws_u:
+        async with (
+            aiohttp.ClientSession() as s,
+            s.ws_connect(
+                UP.replace("http", "ws") + req.path_qs,
+                protocols=(ws_c.ws_protocol and [ws_c.ws_protocol]) or (),
+                max_msg_size=0,
+            ) as ws_u,
+        ):
 
             async def pipe(a, b):
                 async for m in a:
@@ -60,12 +63,15 @@ async def handler(req):
     if req.method == "GET" and req.path in APP_PAGES:
         print(f"holding {req.path} for {DELAY}s", flush=True)
         await asyncio.sleep(DELAY)
-    async with aiohttp.ClientSession(auto_decompress=False) as s, s.request(
-        req.method,
-        UP + req.path_qs,
-        headers={k: v for k, v in req.headers.items() if k.lower() not in HOP},
-        data=await req.read(),
-    ) as r:
+    async with (
+        aiohttp.ClientSession(auto_decompress=False) as s,
+        s.request(
+            req.method,
+            UP + req.path_qs,
+            headers={k: v for k, v in req.headers.items() if k.lower() not in HOP},
+            data=await req.read(),
+        ) as r,
+    ):
         body = await r.read()
         return web.Response(
             status=r.status,
