@@ -204,3 +204,36 @@ run "rejects_provisioned_throughput" {
 
   expect_failures = [var.openai_deployment_sku]
 }
+
+run "probes_fast_but_same_tolerance" {
+  command = plan
+
+  assert {
+    condition = (
+      azurerm_container_app.app.template[0].container[0].startup_probe[0].interval_seconds *
+      azurerm_container_app.app.template[0].container[0].startup_probe[0].failure_count_threshold
+    ) >= 60
+    error_message = "Startup must still tolerate at least 60 s before a restart."
+  }
+
+  assert {
+    condition     = azurerm_container_app.app.template[0].container[0].readiness_probe[0].success_count_threshold == 1
+    error_message = "A single successful readiness check must route traffic (cold-start latency)."
+  }
+
+  assert {
+    condition = (
+      azurerm_container_app.app.template[0].container[0].readiness_probe[0].interval_seconds *
+      azurerm_container_app.app.template[0].container[0].readiness_probe[0].failure_count_threshold
+    ) >= 30
+    error_message = "Readiness must still tolerate at least 30 s of failures."
+  }
+
+  assert {
+    condition = (
+      azurerm_container_app.app.template[0].container[0].liveness_probe[0].interval_seconds == 30 &&
+      azurerm_container_app.app.template[0].container[0].liveness_probe[0].failure_count_threshold == 3
+    )
+    error_message = "Liveness (the restart probe) stays unchanged."
+  }
+}
