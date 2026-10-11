@@ -144,6 +144,9 @@ variables {
   ai_price_input_per_1m  = "0.40"
   ai_price_output_per_1m = "1.60"
   budget_alert_email     = null
+  # Pinned like production: `terraform test` also loads a local terraform.tfvars, so every input
+  # an assertion depends on is set here explicitly (CI has no tfvars).
+  ai_provider = "mock"
 }
 
 run "disabled_by_default_creates_nothing_and_leaves_the_app_unchanged" {
