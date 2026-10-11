@@ -214,8 +214,9 @@ resource "azurerm_container_app" "app" {
         transport               = "HTTP"
         port                    = 8501
         path                    = "/_stcore/health"
-        interval_seconds        = 5
-        failure_count_threshold = 12 # up to ~60 s for a cold start
+        initial_delay           = 1
+        interval_seconds        = 1
+        failure_count_threshold = 60 # same ~60 s startup tolerance; detects readiness within ~1 s
       }
 
       liveness_probe {
@@ -230,8 +231,10 @@ resource "azurerm_container_app" "app" {
         transport               = "HTTP"
         port                    = 8501
         path                    = "/_stcore/health"
-        interval_seconds        = 10
-        failure_count_threshold = 3
+        interval_seconds        = 2
+        failure_count_threshold = 15 # same 30 s tolerance before "not ready" (ACA may restart)
+        # Provider default is 3, i.e. ~20-25 s of extra delay before a new replica gets traffic.
+        success_count_threshold = 1
       }
     }
   }
