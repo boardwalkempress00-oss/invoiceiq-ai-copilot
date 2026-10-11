@@ -69,11 +69,12 @@ class ApiClient:
         path: str,
         *,
         json: dict[str, Any] | None = None,
+        params: dict[str, Any] | None = None,
         timeout: float = DEFAULT_TIMEOUT_SECONDS,
     ) -> Any:
         started = time.perf_counter()
         try:
-            response = self._http.request(method, path, json=json, timeout=timeout)
+            response = self._http.request(method, path, json=json, params=params, timeout=timeout)
         except httpx.TimeoutException as exc:
             self._record(method, path, None, started, None)
             raise ApiError("The InvoiceIQ service took too long to respond.") from exc
@@ -183,4 +184,29 @@ class ApiClient:
                 "history": history,
             },
             timeout=CHAT_TIMEOUT_SECONDS,
+        )
+
+    # -- asynchronous invoice processing ---------------------------------------------------------
+
+    def submit_invoice(
+        self,
+        *,
+        session_id: str,
+        sample_invoice_id: str | None = None,
+        content: str | None = None,
+    ) -> dict[str, Any]:
+        body: dict[str, Any] = {"session_id": session_id}
+        if sample_invoice_id is not None:
+            body["sample_invoice_id"] = sample_invoice_id
+        if content is not None:
+            body["content"] = content
+        return self._request("POST", "/submissions", json=body)  # type: ignore[no-any-return]
+
+    def get_submission(self, submission_id: str) -> dict[str, Any]:
+        return self._request("GET", f"/submissions/{submission_id}")  # type: ignore[no-any-return]
+
+    def list_submissions(self, session_id: str, limit: int = 5) -> list[dict[str, Any]]:
+        # Query parameters keep the session ID out of the recorded request path.
+        return self._request(  # type: ignore[no-any-return]
+            "GET", "/submissions", params={"session_id": session_id, "limit": limit}
         )

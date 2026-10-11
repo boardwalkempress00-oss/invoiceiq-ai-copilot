@@ -38,11 +38,14 @@ jobs:
           uv run ruff format --check .
           uv run ruff check .
 
-      - name: Start Azurite (Table Storage emulator)
+      - name: Start Azurite (Blob + Table Storage emulator)
         run: |
-          docker run -d --name azurite -p 127.0.0.1:10002:10002 "$AZURITE_IMAGE" \
-            azurite-table --tableHost 0.0.0.0 --tablePort 10002 --skipApiVersionCheck --loose
-          for i in $(seq 1 30); do nc -z 127.0.0.1 10002 && exit 0; sleep 1; done
+          docker run -d --name azurite -p 127.0.0.1:10000:10000 -p 127.0.0.1:10002:10002 \
+            "$AZURITE_IMAGE" azurite --blobHost 0.0.0.0 --blobPort 10000 \
+            --tableHost 0.0.0.0 --tablePort 10002 --skipApiVersionCheck --loose
+          for i in $(seq 1 30); do
+            nc -z 127.0.0.1 10000 && nc -z 127.0.0.1 10002 && exit 0; sleep 1
+          done
           echo "Azurite did not start" >&2; exit 1
 
       - name: Pytest (unit, API, frontend, Azurite integration)

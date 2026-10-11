@@ -436,3 +436,41 @@ def measurement_rows(measurements: Sequence[Measurement]) -> list[dict[str, Any]
             }
         )
     return rows
+
+
+# --- Asynchronous processing -------------------------------------------------------------------
+
+_SUBMISSION_BADGES = {
+    "Pending": ("Pending — waiting for the worker", "blue", ":material/schedule:"),
+    "Processing": ("Processing", "violet", ":material/sync:"),
+    "Completed": ("Completed", "green", ":material/task_alt:"),
+    "Failed": ("Failed", "red", ":material/error:"),
+    "DeadLettered": ("Dead-lettered", "red", ":material/report:"),
+    "Stalled": ("Stalled — no progress", "orange", ":material/hourglass_disabled:"),
+}
+
+
+def submission_badge(display_status: str) -> tuple[str, str, str]:
+    """(label, colour, icon) for a submission status."""
+    return _SUBMISSION_BADGES.get(display_status, (display_status, "gray", ":material/help:"))
+
+
+def timeline_rows(submission: dict[str, Any]) -> list[dict[str, str]]:
+    """Timeline steps with UTC clock time and seconds since upload ("—" when not reached)."""
+    from datetime import datetime
+
+    def parse(value: str | None) -> datetime | None:
+        return datetime.fromisoformat(value.replace("Z", "+00:00")) if value else None
+
+    start = parse(submission.get("created_at"))
+    rows = []
+    for step in submission.get("timeline", []):
+        at = parse(step.get("at"))
+        rows.append(
+            {
+                "Step": step["step"],
+                "Time (UTC)": at.strftime("%H:%M:%S") if at else "—",
+                "Since upload": f"+{(at - start).total_seconds():.1f} s" if at and start else "—",
+            }
+        )
+    return rows

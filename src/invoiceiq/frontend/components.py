@@ -17,6 +17,7 @@ PAGE_PATHS = {
     "dashboard": "views/dashboard.py",
     "analysis": "views/analysis.py",
     "chat": "views/chat.py",
+    "process": "views/process.py",
     "architecture": "views/architecture.py",
     "observability": "views/observability.py",
 }

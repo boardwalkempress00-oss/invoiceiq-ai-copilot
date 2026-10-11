@@ -9,6 +9,7 @@ from decimal import Decimal
 from enum import StrEnum
 from functools import lru_cache
 from pathlib import Path
+from urllib.parse import urlsplit
 
 from pydantic import Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -32,6 +33,11 @@ class UsageStoreName(StrEnum):
     MEMORY = "memory"
     SQLITE = "sqlite"
     AZURE_TABLE = "azure_table"
+
+
+class SubmissionBackend(StrEnum):
+    LOCAL = "local"
+    AZURE = "azure"
 
 
 class Settings(BaseSettings):
@@ -87,6 +93,44 @@ class Settings(BaseSettings):
     retrieval_top_k: int = Field(default=3, ge=1, le=10)
     retrieval_min_score: float = Field(default=0.5, ge=0)
 
+    # --- Asynchronous invoice processing (Blob → Event Grid → Service Bus → worker) ---
+    # Off by default: the endpoints answer 404 and the page is hidden until enabled.
+    async_processing_enabled: bool = False
+    # "local": in-process simulation of Event Grid, Service Bus and the worker (development).
+    # "azure": Blob Storage + Table Storage here; the separate worker job does the processing.
+    submission_backend: SubmissionBackend = SubmissionBackend.LOCAL
+    submission_max_bytes: int = Field(default=65_536, ge=1_024, le=262_144)
+    # Public upload allowance — independent of the AI question allowance above.
+    submission_session_daily_limit: int = Field(default=10, ge=0)
+    submission_global_daily_limit: int = Field(default=200, ge=0)
+    submission_retention_days: int = Field(default=7, ge=1, le=30)
+    # Seconds after which a non-terminal submission is reported as stalled.
+    submission_stalled_after_seconds: int = Field(default=180, ge=30)
+    upload_container: str = "invoice-uploads"
+    submissions_table: str = "invoicejobs"
+    # Blob endpoint, e.g. https://<account>.blob.core.windows.net (managed identity).
+    azure_blob_endpoint: str | None = None
+    # Local development against Azurite only. Refused when APP_ENV=production.
+    azure_blob_connection_string: SecretStr | None = None
+    # Local simulation only: delay before the simulated event reaches the worker.
+    local_pipeline_delay_seconds: float = Field(default=1.5, ge=0, le=30)
+
+    # --- Worker (Container Apps Job) ---
+    servicebus_namespace: str | None = None  # e.g. sb-invoiceiq-xxxx.servicebus.windows.net
+    servicebus_queue: str = "invoice-events"
+    # Local Service Bus emulator only. Refused when APP_ENV=production.
+    servicebus_connection_string: SecretStr | None = None
+    # Must equal the queue's max delivery count and lock duration (Terraform).
+    worker_max_delivery_count: int = Field(default=5, ge=1, le=100)
+    worker_lease_seconds: float = Field(default=60, ge=10, le=300)
+    worker_max_messages_per_run: int = Field(default=20, ge=1, le=500)
+    worker_receive_wait_seconds: float = Field(default=5, ge=0, le=60)
+    # Must stay below the job's replica timeout.
+    worker_run_budget_seconds: float = Field(default=240, ge=30, le=3_600)
+    # Expected host of blob URLs in events, e.g. <account>.blob.core.windows.net.
+    # Defaults to the host of AZURE_BLOB_ENDPOINT.
+    worker_expected_blob_host: str | None = None
+
     @property
     def invoices_dir(self) -> Path:
         return self.data_dir / "invoices"
@@ -94,6 +138,15 @@ class Settings(BaseSettings):
     @property
     def policy_path(self) -> Path:
         return self.data_dir / "policies" / "purchasing_policy.md"
+
+    @property
+    def expected_blob_host(self) -> str | None:
+        """Storage account host that event blob URLs must match (None: not checked)."""
+        if self.worker_expected_blob_host:
+            return self.worker_expected_blob_host
+        if self.azure_blob_endpoint:
+            return urlsplit(self.azure_blob_endpoint).netloc or None
+        return None
 
 
 @lru_cache
