@@ -275,15 +275,15 @@ No test calls Azure or a live model.
 
 ## Known limitations
 
-- Not deployed yet; the live Azure OpenAI and Table Storage paths have not run against real Azure.
+- Deployed with the mock provider; the live Azure OpenAI path has not yet run against real Azure.
 - Per-session limits are per browser session; reloading starts a new session. The **global**
   request and cost caps are the hard limits.
 - Streamlit holds a WebSocket per open tab, so an idle tab would keep the replica running. An
   **idle pause** (browser-side, configurable) pauses sessions after 15 min without interaction or
   5 min in a hidden tab, with a 60 s warning; chat history is restored on Resume in the same tab.
   Verified on Azure: the app scaled to zero ~6 min after a pause.
-- Waking from zero takes ~30–50 s (replica scheduling, image pull, probes, ingress routing); the
-  app itself starts in ~2–3 s. Resume shows a "Starting InvoiceIQ" screen meanwhile; a first
+- Waking from zero takes ~25–35 s on Azure (measured average 28 s: replica scheduling, image
+  pull, container creation, ingress routing); the app itself starts in ~2–3 s. Resume shows a "Starting InvoiceIQ" screen meanwhile; a first
   visit to the URL shows the browser's own loading indicator.
 - Observability is per browser session; Azure Monitor dashboards are not yet built.
 - Mock answers are templates; only the live model writes free-form text.

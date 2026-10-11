@@ -215,3 +215,50 @@ Resulting plan: 1 import, 2 creates, 0 changes, 0 destroys.
 
 **2026-10-10 — second apply.** `1 imported, 2 added, 0 changed, 0 destroyed`. A follow-up plan
 reports no changes. App URL: https://ca-invoiceiq-dbmr0.bravewater-5e6a1283.swedencentral.azurecontainerapps.io
+
+**2026-10-11 — image deployment (approved).** Image
+`ghcr.io/boardwalkempress00-oss/invoiceiq-ai-copilot@sha256:78dc55f845e7c9eca9e230daaaf670124d4ac0f97d9620d12b09ba80396af7ba`
+(commit `9bd7dd1`: cold-start Resume screen, idle pause, OpenAI prompt-logging safeguard), built
+and smoke-tested by the manual *Publish image* workflow. Plan re-checked against the saved plan
+before applying: `0 added, 1 changed, 0 destroyed`, only the container image. Revision `--0000003`
+became Healthy. Verified: all five pages, mock chat with citations, AI spend 0 USD, daily and
+per-session limits (11th question answered read-only), idle pause → scale to zero → Resume with
+page, invoice and conversation restored. A follow-up plan reports no changes.
+
+**2026-10-11 — probe tuning (approved, PR #7, merge `1d32d3f`).** Readiness used the provider's
+default of 3 consecutive successes at a 10 s interval, so a replica waking from zero received
+traffic ~20–25 s after the app was ready (it starts in ~2–3 s). Plan: `0 added, 1 changed,
+0 destroyed`, six probe attributes only; image, liveness, `AI_PROVIDER=mock`, scaling (0–1),
+identity, RBAC, storage and budget unchanged. Revision `--0000004` became Healthy.
+
+| Probe | Before | After | Tolerance |
+|---|---|---|---|
+| Startup | every 5 s, 12 failures, no delay | every 1 s, 60 failures, 1 s delay | ~60 s (unchanged) |
+| Readiness | every 10 s, 3 failures, **3 successes** | every 2 s, 15 failures, **1 success** | 30 s (unchanged) |
+| Liveness | every 30 s, 3 failures | unchanged | 90 s |
+
+Probe health: each cold start logs 2 startup-probe failures in the ~2 s before the app listens
+(expected; threshold 60). No readiness or liveness failures and no restarts (restart count 0);
+the only container terminations are scale-to-zero stops.
+
+**Cold start, measured on Azure** (hidden-tab idle pause → zero replicas confirmed → Resume click;
+seconds after the click, from Azure system and application logs):
+
+| Run | Scheduled | Image pulled | Container started | App ready | Health answered | Usable |
+|---|---|---|---|---|---|---|
+| Before (revision `--0000003`) | | | | | 52 | 58 |
+| 1 | 1 | 10.6 | 16.7 | 19.8 | 22.9 | **24.6** |
+| 2 | 0 | 9.6 | 15.6 | 18.5 | 31.6 | **33.1** |
+| 3 | 0 | 11.3 | 17.9 | 21.0 | 24.5 | **26.4** |
+
+Average time to a usable page: **28.0 s, down from 58 s** (navigation: 26.3 s, down from 52 s).
+Each run restored `/chat`, the selected invoice and its conversation, and showed the "Starting
+InvoiceIQ" screen within 0.1 s of the click. The remaining time is mostly platform work
+(scheduling, ~7–8 s image pull, ~6 s container creation); run 2 spent ~13 s between app ready
+and the first routed response (ingress), the others ~3 s.
+
+**Scale to zero:** after each pause the app reached zero replicas 345–360 s later, and 360 s after
+the last browser closed. An external request (not part of the test) woke the app once at
+12:45 UTC, as expected for a public URL; it scaled down again without intervention.
+
+**Live AI remains disabled:** `AI_PROVIDER=mock`; Azure OpenAI reports 0 requests and 0 tokens.
