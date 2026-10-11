@@ -211,6 +211,22 @@ def test_paused_page_is_self_contained():
     assert not re.search(r"""(?i)<(script|link|img)[^>]+(src|href)=["']https?:""", html)
     assert not re.search(r"(?i)\son[a-z]+\s*=", html)  # no inline event handlers
     assert 'href="/"' in html  # works without JavaScript
-    assert "location.assign" not in html and "location.href =" not in html  # no auto-navigation
+    assert "location.href =" not in html  # navigation only via the Resume click handler
     # Resume target is restricted to known app routes.
     assert r"/^\/(analysis|chat|architecture|observability)?$/" in html
+
+
+def test_paused_page_shows_cold_start_message_without_polling():
+    html = STATIC.read_text(encoding="utf-8")
+    assert 'id="starting-view"' in html and "Starting InvoiceIQ" in html
+    assert "may take up to a minute" in html
+    assert 'role="status"' in html and 'aria-live="polite"' in html
+    # One bounded wake-up request, then a single navigation: no loops, no repeated requests.
+    assert html.count("fetch(") == 1 and 'fetch("/_stcore/health"' in html
+    assert ".then(go, go)" in html  # navigate exactly once on success or failure
+    assert "120000" in html  # bounded by a give-up timeout
+    for forbidden in ("setInterval", "XMLHttpRequest", "location.replace", "while ("):
+        assert forbidden not in html, forbidden
+    assert html.count("location.assign(") == 1  # only inside the Resume click handler
+    assert html.count("setTimeout(") == 2  # slow hint + give-up, both one-off
+    assert "prefers-reduced-motion" in html

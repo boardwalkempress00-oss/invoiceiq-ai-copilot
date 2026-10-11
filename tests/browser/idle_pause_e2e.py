@@ -11,6 +11,8 @@ Not collected by pytest. Run against two local instances with short timeouts:
       uv run streamlit run src/invoiceiq/frontend/app.py --server.port 8702
     uv run --no-project --with playwright python tests/browser/idle_pause_e2e.py
 
+The cold-start loading view is checked separately in tests/browser/cold_start_e2e.py.
+
 Hidden tabs are simulated by overriding document.visibilityState (headless Chrome never hides
 a tab); WebSocket closure is verified server-side by counting ESTABLISHED TCP connections (lsof).
 """
@@ -243,6 +245,8 @@ with sync_playwright() as p:
         answered = False
     ok("5f. question clicked immediately after first load is answered", answered)
     ctx.close()
+
+    # 7. Cold start UX: see tests/browser/cold_start_e2e.py (needs the async Playwright API).
 
     # 6. Malicious sessionStorage content cannot execute script or break the app.
     ctx, pg, log = open_app(br, B, "/chat")

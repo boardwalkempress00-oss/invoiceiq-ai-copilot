@@ -17,24 +17,78 @@
                padding: 10px 22px; border-radius: 8px; font-weight: 600; }
     a.button:focus-visible { outline: 3px solid #9cc3e8; outline-offset: 2px; }
     small { display: block; margin-top: 1.25rem; color: var(--muted); }
+    [hidden] { display: none !important; }
+    /* Starting state: CSS-only animation, no timers or network polling. */
+    .spinner { width: 40px; height: 40px; margin: 0 auto 1rem; border-radius: 50%;
+               border: 4px solid #dbe7f3; border-top-color: var(--blue); animation: spin 1s linear infinite; }
+    .bar { height: 6px; border-radius: 3px; background: #e3e8ef; overflow: hidden; margin: 0 0 1rem; }
+    .bar > span { display: block; height: 100%; width: 40%; background: var(--blue); border-radius: 3px;
+                  animation: slide 1.6s ease-in-out infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    @keyframes slide { 0% { transform: translateX(-100%); } 100% { transform: translateX(250%); } }
+    @media (prefers-reduced-motion: reduce) { .spinner, .bar > span { animation: none; } }
   </style>
 </head>
 <body>
   <main>
-    <h1>Session paused</h1>
-    <p>InvoiceIQ paused this session after a period of inactivity, so the demo can scale down
-       and stay inexpensive. Your conversation in this tab is kept.</p>
-    <a class="button" id="resume" href="/">Resume</a>
-    <small>Fictional demo data · nothing is lost by pausing</small>
+    <section id="paused-view">
+      <h1>Session paused</h1>
+      <p>InvoiceIQ paused this session after a period of inactivity, so the demo can scale down
+         and stay inexpensive. Your conversation in this tab is kept.</p>
+      <a class="button" id="resume" href="/">Resume</a>
+      <small>Fictional demo data · nothing is lost by pausing</small>
+    </section>
+    <section id="starting-view" role="status" aria-live="polite" hidden>
+      <div class="spinner" aria-hidden="true"></div>
+      <h1>Starting InvoiceIQ</h1>
+      <p>This may take up to a minute while the demo wakes up from zero to keep hosting
+         costs low. Your conversation will be restored automatically.</p>
+      <div class="bar" aria-hidden="true"><span></span></div>
+      <small id="slow-hint" hidden>Still starting — this is taking longer than usual. You can keep
+        waiting, or <a href="/">reload</a> if nothing happens.</small>
+    </section>
   </main>
   <script>
     // Return to the page that was open, but only to a known app route (never an arbitrary URL).
+    var resume = document.getElementById("resume");
     try {
       var path = sessionStorage.getItem("invoiceiq.resume.path");
       if (path && /^\/(analysis|chat|architecture|observability)?$/.test(path)) {
-        document.getElementById("resume").setAttribute("href", path);
+        resume.setAttribute("href", path);
+        document.getElementById("slow-hint").querySelector("a").setAttribute("href", path);
       }
     } catch (e) {}
+
+    var slowTimer = null;
+    function showPaused() {
+      clearTimeout(slowTimer);
+      document.getElementById("paused-view").hidden = false;
+      document.getElementById("starting-view").hidden = true;
+      document.getElementById("slow-hint").hidden = true;
+    }
+
+    // Wait for the app here, on a page that stays visible, then navigate once. One request to
+    // the health endpoint: while the app is scaled to zero, Azure's ingress holds it until a
+    // replica is running. Not a polling loop — whatever the outcome (ready, error, or the
+    // 120 s give-up), the browser navigates exactly once. Without JavaScript the link works.
+    resume.addEventListener("click", function (event) {
+      event.preventDefault();
+      var target = resume.getAttribute("href") || "/";
+      document.getElementById("paused-view").hidden = true;
+      document.getElementById("starting-view").hidden = false;
+      slowTimer = setTimeout(function () {                     // one-off hint
+        document.getElementById("slow-hint").hidden = false;
+      }, 90000);
+      var controller = window.AbortController ? new AbortController() : null;
+      var giveUp = setTimeout(function () { if (controller) controller.abort(); }, 120000);
+      var go = function () { clearTimeout(giveUp); window.location.assign(target); };
+      fetch("/_stcore/health", { cache: "no-store", credentials: "same-origin",
+                                 signal: controller ? controller.signal : undefined })
+        .then(go, go);
+    });
+
+    // Back/forward cache: restore the paused view if the user navigates back to this page.
+    window.addEventListener("pageshow", function (event) { if (event.persisted) showPaused(); });
   </script>
 </body>
 </html>
