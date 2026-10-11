@@ -68,5 +68,8 @@ def configure_logging(level: str = "INFO", azure_sdk_level: str | None = None) -
     # Azure SDK: per-request HTTP logging and credential-chain chatter (covers azure.core and
     # azure.identity). Our own code logs usage-limiter failures and AI timings separately.
     logging.getLogger("azure").setLevel(azure_sdk_level.upper())
-    # OpenAI SDK retries are logged at INFO and are useful operational diagnostics: keep them.
-    logging.getLogger("openai").setLevel(level.upper())
+    # OpenAI SDK retries are logged at INFO and are useful diagnostics: keep them. Never go below
+    # INFO: at DEBUG the SDK logs full request bodies, which contain the user's question.
+    root_level = logging.getLevelName(level.upper())
+    openai_level = max(root_level, logging.INFO) if isinstance(root_level, int) else logging.INFO
+    logging.getLogger("openai").setLevel(openai_level)

@@ -95,3 +95,13 @@ def test_chat_request_never_logs_question_text(json_logs):
     dumped = json.dumps(json_logs())
     assert "ZXQW" not in dumped and "12345678 ZXQW" not in dumped
     assert '"chat.completed"' in dumped and '"question_chars"' in dumped
+
+
+def test_openai_sdk_never_logs_request_bodies_even_at_debug(json_logs):
+    # The OpenAI SDK logs full request options (including prompts) at DEBUG.
+    configure_logging("DEBUG")
+    assert logging.getLogger("openai").getEffectiveLevel() == logging.INFO
+    logging.getLogger("openai._base_client").debug("Request options: {'messages': 'SECRET-Q'}")
+    logging.getLogger("openai._base_client").info("Retrying request to /chat/completions")
+    dumped = json.dumps(json_logs())
+    assert "SECRET-Q" not in dumped and "Retrying request" in dumped

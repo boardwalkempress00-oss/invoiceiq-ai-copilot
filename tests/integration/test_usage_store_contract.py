@@ -303,3 +303,49 @@ def test_unreachable_table_storage_fails_closed_quickly():
     with pytest.raises(LimiterUnavailableError):
         limiter(store).reserve("s1", EST)
     assert time.monotonic() - started < 10
+
+
+def test_concurrent_reservations_never_exceed_the_monetary_budget(store_factory):
+    """Many sessions race for a cost budget that fits exactly 12 reservations."""
+    est = UsageEstimate(tokens=2_900, cost_micro=2_200)  # ≈ a live gpt-4.1-mini question
+    budget = 12 * est.cost_micro
+    limiters = [
+        limiter(store_factory(), daily_cost_limit_micro=budget, global_daily_limit=1_000)
+        for _ in range(4)
+    ]
+    granted: list = []
+    lock = threading.Lock()
+
+    def worker(i: int) -> None:
+        lim = limiters[i % len(limiters)]
+        for j in range(3):
+            try:
+                decision = lim.reserve(f"budget-{i}-{j}", est)
+            except LimiterUnavailableError:
+                continue
+            if decision.allowed:
+                with lock:
+                    granted.append((lim, decision.reservation))
+            else:
+                assert decision.reason == LimitReason.DAILY_BUDGET_REACHED
+
+    run_threads(16, worker)  # 48 attempts for 12 budget slots
+    assert len(granted) == 12
+    reserved = limiters[0].snapshot()
+    assert reserved.reserved_cost_micro == budget and reserved.spent_cost_micro == 0
+
+    # Settle concurrently at an actual cost lower than the estimate: reservations are released
+    # and spend reconciles to exactly the sum of actual costs.
+    def settle(i: int) -> None:
+        for lim, reservation in granted[i::6]:
+            lim.settle(reservation, SettleOutcome.SUCCEEDED, prompt_tokens=1_400,
+                       completion_tokens=350, actual_cost_micro=1_300)  # fmt: skip
+
+    run_threads(6, settle)
+    final = limiters[0].snapshot()
+    assert final.reserved_cost_micro == 0
+    assert final.spent_cost_micro == 12 * 1_300
+    assert (final.actual_prompt_tokens, final.actual_completion_tokens) == (12 * 1_400, 12 * 350)
+    assert final.unreconciled == 0
+    # Freed budget is usable again: 12 × 1,300 spent leaves room for 5 more reservations.
+    assert limiters[1].reserve("after-settle", est).allowed
