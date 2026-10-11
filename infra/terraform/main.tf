@@ -203,7 +203,7 @@ resource "azurerm_container_app" "app" {
       memory = "1Gi"
 
       dynamic "env" {
-        for_each = local.app_env
+        for_each = merge(local.app_env, local.async_app_env) # async_app_env is {} by default
         content {
           name  = env.key
           value = env.value
@@ -243,6 +243,8 @@ resource "azurerm_container_app" "app" {
   depends_on = [
     azurerm_role_assignment.app_openai_user,
     azurerm_role_assignment.app_table_data,
+    azurerm_role_assignment.app_uploads_writer, # empty unless event_processing_enabled
+    azurerm_role_assignment.app_jobs_table,
   ]
 }
 

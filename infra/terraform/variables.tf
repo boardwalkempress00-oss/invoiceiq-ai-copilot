@@ -212,3 +212,77 @@ variable "github_environment" {
   type        = string
   default     = "production"
 }
+
+# --- Asynchronous invoice processing (see event_processing.tf) ---------------------------------
+
+variable "event_processing_enabled" {
+  description = "Create the asynchronous processing infrastructure (Blob container, status table, Event Grid, Service Bus Basic, worker job). Requires Microsoft.EventGrid and Microsoft.ServiceBus to be registered."
+  type        = bool
+  default     = false
+}
+
+variable "async_processing_enabled" {
+  description = "Expose invoice upload in the app (ASYNC_PROCESSING_ENABLED). Requires event_processing_enabled."
+  type        = bool
+  default     = false
+
+  validation {
+    condition     = !var.async_processing_enabled || var.event_processing_enabled
+    error_message = "async_processing_enabled requires event_processing_enabled = true."
+  }
+}
+
+variable "submission_session_daily_limit" {
+  description = "Invoice uploads per browser session per UTC day (separate from the AI allowance)."
+  type        = number
+  default     = 10
+
+  validation {
+    condition     = var.submission_session_daily_limit >= 0 && var.submission_session_daily_limit <= 100
+    error_message = "submission_session_daily_limit must be between 0 and 100."
+  }
+}
+
+variable "submission_global_daily_limit" {
+  description = "Invoice uploads for the whole demo per UTC day."
+  type        = number
+  default     = 200
+
+  validation {
+    condition     = var.submission_global_daily_limit >= 0 && var.submission_global_daily_limit <= 2000
+    error_message = "submission_global_daily_limit must be between 0 and 2000."
+  }
+}
+
+variable "submission_retention_days" {
+  description = "Days after which uploaded invoices (and Event Grid dead-letters) are deleted."
+  type        = number
+  default     = 7
+
+  validation {
+    condition     = var.submission_retention_days >= 1 && var.submission_retention_days <= 30
+    error_message = "submission_retention_days must be between 1 and 30."
+  }
+}
+
+variable "worker_polling_interval_seconds" {
+  description = "How often KEDA checks the queue. Shorter = faster pickup, more (cheap) queue reads."
+  type        = number
+  default     = 10
+
+  validation {
+    condition     = var.worker_polling_interval_seconds >= 5 && var.worker_polling_interval_seconds <= 60
+    error_message = "worker_polling_interval_seconds must be between 5 and 60."
+  }
+}
+
+variable "worker_max_executions" {
+  description = "Maximum concurrent worker job executions."
+  type        = number
+  default     = 3
+
+  validation {
+    condition     = var.worker_max_executions >= 1 && var.worker_max_executions <= 5
+    error_message = "worker_max_executions must be between 1 and 5."
+  }
+}
