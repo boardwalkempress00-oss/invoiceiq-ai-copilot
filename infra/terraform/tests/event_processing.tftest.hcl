@@ -202,7 +202,7 @@ run "enabled_infrastructure_is_least_privilege_and_cheap" {
   assert {
     condition = alltrue([
       azurerm_servicebus_queue.invoice_events[0].max_delivery_count == 5,
-      azurerm_servicebus_queue.invoice_events[0].lock_duration == "PT60S",
+      azurerm_servicebus_queue.invoice_events[0].lock_duration == "PT1M",
       azurerm_servicebus_queue.invoice_events[0].default_message_ttl == "P1D",
       azurerm_servicebus_queue.invoice_events[0].dead_lettering_on_message_expiration,
       !azurerm_servicebus_queue.invoice_events[0].requires_duplicate_detection,
@@ -311,8 +311,8 @@ run "enabled_infrastructure_is_least_privilege_and_cheap" {
   assert {
     condition = alltrue([
       for s in azapi_resource.worker_job[0].body.properties.configuration.identitySettings :
-      (s.identity == azurerm_user_assigned_identity.scaler[0].id && s.lifecycle == "None") ||
-      (s.identity == azurerm_user_assigned_identity.worker[0].id && s.lifecycle == "Main")
+      (lower(s.identity) == lower(azurerm_user_assigned_identity.scaler[0].id) && s.lifecycle == "None") ||
+      (lower(s.identity) == lower(azurerm_user_assigned_identity.worker[0].id) && s.lifecycle == "Main")
     ]) && length(azapi_resource.worker_job[0].body.properties.configuration.identitySettings) == 2
     error_message = "The scaler identity must not be available to container code (lifecycle None)."
   }
