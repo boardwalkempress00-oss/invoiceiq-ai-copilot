@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import re
 from html import unescape
 
@@ -170,3 +171,81 @@ def test_demo_allowance_message_is_shown(run_page):
     next(b for b in at.button if b.key == "run_demo-clean").click().run()
     assert not at.exception
     assert any("daily allowance" in e.value for e in at.error)
+
+
+# --- Scroll to the result after a run ----------------------------------------------------------
+# Scrolling itself happens in the browser (checked by tests/browser/demo_autoscroll_e2e.py).
+# These tests pin the Python side: a fresh token per successful run, the same token on ordinary
+# reruns, no token for a refused run, and nothing from the invoice inside the script.
+
+FEEDBACK = "Scenario processed — showing results below."
+SCENARIO_IDS = [
+    "demo-clean", "demo-approved-manager", "demo-approval-missing", "demo-insufficient-authority",
+    "demo-vat-error", "demo-line-error", "demo-nonstandard-vat", "demo-foreign-supplier",
+    "demo-foreign-currency", "demo-missing-fields",
+]  # fmt: skip
+
+
+def scroll_anchor(at):
+    found = [
+        e for e in at.get("bidi_component") if e.proto.component_name.endswith("scroll_anchor")
+    ]
+    return found[0] if found else None
+
+
+def anchor_token(at) -> str | None:
+    anchor = scroll_anchor(at)
+    return json.loads(anchor.proto.json)["token"] if anchor else None
+
+
+def click_run(at, scenario_id: str):
+    next(b for b in at.button if b.key == f"run_{scenario_id}").click().run()
+    assert not at.exception
+    return at
+
+
+def test_no_scroll_anchor_before_any_run(run_page):
+    at = run_page("demo", client=demo_client())
+    assert scroll_anchor(at) is None
+    assert FEEDBACK not in text(at)
+
+
+@pytest.mark.parametrize("scenario_id", SCENARIO_IDS)
+def test_every_successful_run_requests_a_scroll_to_the_result(run_page, scenario_id):
+    at = click_run(run_page("demo", client=demo_client()), scenario_id)
+    token = anchor_token(at)
+    assert token and re.fullmatch(r"[0-9a-f]{16}", token)
+    assert [s.value for s in at.subheader][-1] == "2 · Processing result"
+    # The anchor sits directly above the result heading, and the feedback is shown once.
+    assert sum(FEEDBACK in s.value for s in at.success) == 1
+
+
+def test_a_new_run_gets_a_new_token_and_reruns_keep_it(run_page):
+    at = click_run(run_page("demo", client=demo_client()), "demo-vat-error")
+    first = anchor_token(at)
+    at.run()  # an ordinary rerun: same token, so the browser does not scroll again
+    assert anchor_token(at) == first
+    click_run(at, "demo-clean")
+    second = anchor_token(at)
+    assert second and second != first
+    # Only the card that ran last shows the feedback.
+    assert sum(FEEDBACK in s.value for s in at.success) == 1
+
+
+def test_a_refused_run_does_not_request_a_scroll(run_page):
+    client = make_api_client(demo_mode_enabled=True, demo_session_daily_limit=1)
+    at = click_run(run_page("demo", client=client), "demo-clean")
+    first = anchor_token(at)
+    click_run(at, "demo-vat-error")
+    assert any("daily allowance" in e.value for e in at.error)
+    assert anchor_token(at) == first
+
+
+def test_scroll_script_contains_no_page_data(run_page):
+    at = click_run(run_page("demo", client=demo_client()), "demo-vat-error")
+    anchor = scroll_anchor(at)
+    script = anchor.proto.js_content
+    run = at.session_state["demo_last_run"]
+    for value in (anchor_token(at), run["run_id"], run["invoice"]["invoice_number"], "Bøgely"):
+        assert value not in script
+    assert set(json.loads(anchor.proto.json)) == {"token"}
