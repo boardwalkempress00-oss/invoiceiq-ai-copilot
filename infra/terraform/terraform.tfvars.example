@@ -27,3 +27,6 @@ session_request_limit      = 10
 # Free budget alert on the resource group (alerts only).
 # budget_alert_email    = "you@example.com"
 # monthly_budget_amount = 10
+
+# Simulated, in-memory processing demo (no Azure storage or messaging). Off by default.
+# demo_mode_enabled = false

@@ -156,6 +156,9 @@ locals {
     GLOBAL_DAILY_COST_LIMIT    = var.global_daily_cost_limit
     GLOBAL_DAILY_REQUEST_LIMIT = tostring(var.global_daily_request_limit)
     SESSION_REQUEST_LIMIT      = tostring(var.session_request_limit)
+    # Simulated, in-memory processing demo. Independent of ASYNC_PROCESSING_ENABLED and never
+    # uses Azure storage or messaging.
+    DEMO_MODE_ENABLED = tostring(var.demo_mode_enabled)
   }
 }
 

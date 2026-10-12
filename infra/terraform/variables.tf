@@ -213,6 +213,14 @@ variable "github_environment" {
   default     = "production"
 }
 
+# --- Public processing demo ----------------------------------------------------------------------
+
+variable "demo_mode_enabled" {
+  description = "Show the simulated processing demo (DEMO_MODE_ENABLED): predefined fictional scenarios processed in memory. Uses no Azure storage or messaging and is independent of async_processing_enabled."
+  type        = bool
+  default     = false
+}
+
 # --- Asynchronous invoice processing (see event_processing.tf) ---------------------------------
 
 variable "event_processing_enabled" {
