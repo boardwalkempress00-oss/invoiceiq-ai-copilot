@@ -202,5 +202,48 @@ def invoice_selector(invoices: list[dict[str, Any]], key: str) -> str:
     return chosen
 
 
+# --- Scroll to a section once, after a new action --------------------------------------------
+# Streamlit has no "scroll to element" API. This Components v2 element is mounted just above the
+# section to reveal and scrolls *itself* into view, so no CSS selector or DOM query is needed.
+# It scrolls only when `token` is new for this browser tab: Python creates a fresh random token
+# when an action succeeds, and every later rerun (widget changes, navigation back to the page)
+# passes the same token, which the tab has already handled. The token arrives through the
+# component's data channel; nothing is ever interpolated into the script.
+_SCROLL_JS = r"""
+export default function (component) {
+  const { data, parentElement } = component;
+  const token = data && typeof data.token === "string" ? data.token : "";
+  if (!token || !parentElement) return;
+  const seen = (window.__invoiceiqScrollTokens = window.__invoiceiqScrollTokens || new Set());
+  if (seen.has(token)) return;
+  seen.add(token);
+
+  const target = parentElement;
+  target.style.scrollMarginTop = "4.5rem";  // clear Streamlit's fixed header
+  const reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  let userScrolled = false;
+  const stop = () => { userScrolled = true; };
+  const events = ["wheel", "touchstart", "keydown"];
+  events.forEach((e) => window.addEventListener(e, stop, { passive: true }));
+  const reveal = () => {
+    if (userScrolled || !target.isConnected) return;
+    target.scrollIntoView({ behavior: reduce ? "auto" : "smooth", block: "start" });
+  };
+  // After the browser has laid out this rerun, and once more when the content below has
+  // rendered (the page can be too short to scroll fully at first). A user scroll cancels it.
+  requestAnimationFrame(() => requestAnimationFrame(reveal));
+  setTimeout(reveal, 450);
+  setTimeout(() => events.forEach((e) => window.removeEventListener(e, stop)), 1500);
+}
+"""
+
+
+def scroll_into_view_once(key: str, token: str | None) -> None:
+    """Mount an invisible anchor that scrolls itself into view the first time `token` is seen."""
+    st.components.v2.component(
+        "invoiceiq_scroll_anchor", html="<span></span>", js=_SCROLL_JS, isolate_styles=False
+    )(key=key, data={"token": token or ""})
+
+
 def go(page: str) -> None:
     st.switch_page(PAGE_PATHS[page])

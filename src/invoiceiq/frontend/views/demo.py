@@ -7,6 +7,8 @@ historical, verified Azure run separately — the two are never mixed.
 
 from __future__ import annotations
 
+import secrets
+
 import streamlit as st
 
 from invoiceiq.frontend import components, state
@@ -14,6 +16,7 @@ from invoiceiq.frontend.api_client import ApiError
 from invoiceiq.frontend.presentation import group_findings, money, severity_style
 
 LAST = "demo_last_run"
+SCROLL = "demo_scroll_token"  # new random value per successful run; see scroll_into_view_once
 
 components.hero(
     "Try invoice processing",
@@ -54,8 +57,12 @@ for i, scenario in enumerate(scenarios):
                 st.session_state[LAST] = client.run_demo(
                     session_id=state.session_id(), scenario_id=scenario["scenario_id"]
                 )
+                st.session_state[SCROLL] = secrets.token_hex(8)
             except ApiError as error:
                 st.error(components.md_literal(error.message), icon=":material/error:")
+        last = st.session_state.get(LAST)
+        if last and last.get("scenario_id") == scenario["scenario_id"]:
+            st.success("Scenario processed — showing results below.", icon=":material/south:")
 
 
 def _render_run(run: dict) -> None:
@@ -145,7 +152,8 @@ def _render_reference() -> None:
 run = st.session_state.get(LAST)
 if run:
     st.divider()
-    st.subheader("2 · Result")
+    components.scroll_into_view_once("demo_result_anchor", st.session_state.get(SCROLL))
+    st.subheader("2 · Processing result")
     left, right = st.columns([3, 2], gap="large")
     with left:
         st.markdown(f"**This demo run** — {components.md_literal(run['scenario_title'])}")
