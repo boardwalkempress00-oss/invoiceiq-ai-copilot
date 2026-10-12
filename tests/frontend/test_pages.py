@@ -165,11 +165,13 @@ def test_architecture_distinguishes_evidence_levels(run_page):
     assert statuses["Background worker (Container Apps Job)"] == "✓ Verified in Azure"
     assert statuses["Azure OpenAI provider"] == "✓ Verified in Azure (controlled)"
     assert statuses["Retries, lease takeover, dead-lettering"].startswith("✓ Verified locally")
-    assert statuses["Public demo of invoice processing"] == "✓ Verified locally (automated tests)"
+    assert statuses["Public demo of invoice processing"] == "◐ Deployed · simulated in memory"
     assert statuses["Azure AI Search"] == "○ Planned"
-    # Every status is one of the three evidence levels; nothing is left unlabelled.
+    # Every status is one of the four evidence levels; nothing is left unlabelled.
     assert all(
-        s.startswith(("✓ Verified in Azure", "✓ Verified locally", "○ Planned"))
+        s.startswith(
+            ("✓ Verified in Azure", "✓ Verified locally", "◐ Deployed · simulated", "○ Planned")
+        )
         for s in statuses.values()
     )
 
@@ -214,6 +216,19 @@ def test_frontend_does_not_import_backend_logic():
                 names = [node.module]
             for name in names:
                 assert not name.startswith(forbidden), f"{path.name} imports {name}"
+
+
+def test_sidebar_starts_collapsed_on_small_screens():
+    # "auto" shows the sidebar on desktop and collapses it on phones, where an expanded sidebar
+    # covers the page. AppTest has no viewport, so this checks the configuration itself.
+    tree = ast.parse((Path(FRONTEND_DIR) / "app.py").read_text(encoding="utf-8"))
+    calls = [
+        n for n in ast.walk(tree)
+        if isinstance(n, ast.Call) and getattr(n.func, "attr", "") == "set_page_config"
+    ]  # fmt: skip
+    assert len(calls) == 1
+    kwargs = {k.arg: k.value.value for k in calls[0].keywords if isinstance(k.value, ast.Constant)}
+    assert kwargs["initial_sidebar_state"] == "auto"
 
 
 def test_no_legacy_pages_directory():

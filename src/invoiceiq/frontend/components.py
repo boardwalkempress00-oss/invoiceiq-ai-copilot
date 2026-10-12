@@ -67,6 +67,12 @@ h1, h2, h3 { color: var(--iq-ink); letter-spacing: -0.01em; }
   font-size: .9rem; margin: .35rem 0; }
 .iq-list { margin: .25rem 0 .5rem 1.1rem; padding: 0; font-size: .9rem; }
 .iq-kv b { color: var(--iq-muted); font-weight: 600; }
+.iq-timeline { width: 100%; border-collapse: collapse; font-size: .9rem; table-layout: fixed; }
+.iq-timeline th, .iq-timeline td { text-align: left; vertical-align: top; padding: 6px 8px;
+  border-bottom: 1px solid var(--iq-line); overflow-wrap: anywhere; }
+.iq-timeline th { color: var(--iq-muted); font-weight: 600; font-size: .8rem; }
+.iq-timeline .iq-t { width: 6.5rem; white-space: nowrap; font-variant-numeric: tabular-nums;
+  color: var(--iq-ink); font-weight: 600; }
 </style>
 """
 
@@ -123,6 +129,17 @@ def finding_html(finding: dict[str, Any]) -> str:
 def details_html(details: list[Any]) -> str:
     items = "".join(f"<li><code>{esc(d)}</code></li>" for d in details)
     return f'<ul class="iq-list">{items}</ul>'
+
+
+def timeline_html(time_label: str, rows: list[tuple[str, str]]) -> str:
+    """A two-column timeline, time first. Text wraps, so the time is never scrolled out of view."""
+    body = "".join(f'<tr><td class="iq-t">{esc(t)}</td><td>{esc(event)}</td></tr>'
+                   for t, event in rows)  # fmt: skip
+    return (
+        '<table class="iq-timeline"><thead><tr>'
+        f'<th class="iq-t">{esc(time_label)}</th><th>Event</th></tr></thead>'
+        f"<tbody>{body}</tbody></table>"
+    )
 
 
 def hero(title: str, subtitle: str, tag: str | None = None) -> None:

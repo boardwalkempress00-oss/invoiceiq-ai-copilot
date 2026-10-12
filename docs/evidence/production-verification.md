@@ -8,7 +8,7 @@ described; cost figures are **estimates** from list prices unless stated otherwi
 |---|---|
 | **Verified in Azure** | Observed in the production subscription, with logs or metrics as evidence |
 | **Verified locally** | Covered by automated tests (unit, integration with Azurite, Terraform plan tests) |
-| **Simulated** | Runs the real code with in-memory stand-ins (local development pipeline) |
+| **Simulated** | Runs the real code with in-memory stand-ins (the public *Try processing* demo and the local development pipeline) |
 | **Planned** | Designed, not built |
 
 ## Summary
@@ -19,8 +19,8 @@ described; cost figures are **estimates** from list prices unless stated otherwi
 | Deterministic validation, BM25 citations, mock AI, usage limiter on Table Storage | Verified in Azure |
 | Azure OpenAI (gpt-4.1-mini) answers with citations | Verified in Azure — controlled test only (5 requests); production runs in mock mode |
 | Upload → Blob Storage → Event Grid → Service Bus Basic → Container Apps Job → result | Verified in Azure — 6 submissions (E1, E2); switched off for the public |
-| Duplicate handling, leases, retries, dead-lettering, lock renewal | Verified locally (99 processing tests incl. concurrency and failure scenarios) — **not exercised in Azure** |
-| Public demo of invoice processing | Planned (simulated scenario gallery, clearly labelled) |
+| Duplicate handling, leases, retries, dead-lettering, lock renewal | Verified locally (99 processing tests at the time of Phase E2, incl. concurrency and failure scenarios) — **not exercised in Azure** |
+| Public demo of invoice processing (*Try processing*) | Deployed 2026-10-12 — **simulated** in memory; uses no Azure storage or messaging (Phase F2) |
 
 The public site runs with `AI_PROVIDER=mock` and `ASYNC_PROCESSING_ENABLED=false`. Live AI and
 asynchronous processing were switched on only for short tests behind a temporary IP allowlist
@@ -124,6 +124,26 @@ messages and processed them within 0.2 s, because each run keeps receiving until
 empty; the other two started 1.7 s and 3.4 s later, found nothing and exited cleanly. Correct
 and safe, but bursts can start executions that do no work (here about 16 vCPU-seconds). Possible
 tuning: let each execution take a single message, or lower the maximum.
+
+## Phase F2 — public demo deployment (2026-10-12)
+
+One Terraform update of the web Container App only, from a reviewed saved plan
+(0 to add, 1 to change, 0 to destroy):
+
+- New revision `ca-invoiceiq-dbmr0--0000014`, image
+  `sha256:1650fbec9dc2d93ea43272e6d7de1335792b44586161f25ece4c57ec0d81a44e`;
+  `DEMO_MODE_ENABLED=true`, `ASYNC_PROCESSING_ENABLED=false`, `AI_PROVIDER=mock`.
+- The worker job stayed on its previous image (`sha256:c6f7c318…6626`), pinned separately.
+- Smoke test: Start here is the default page; *Try InvoiceIQ* opens a gallery of 10 scenarios;
+  **one** scenario (*Wrong VAT amount*) was run. It was labelled *Simulated in this container*,
+  returned Requires Review with two arithmetic findings, and the historical E1 run was shown
+  in a separate panel.
+- Inside the container: `/health` reported demo on, asynchronous processing off, mock AI;
+  `/submissions` answered 404 `feature_disabled`; the API exposes three `/demo` operations and
+  no file-upload endpoint. From the internet, every API path returns the Streamlit page.
+- Before and after the deployment and smoke test, cumulative metrics were unchanged: Service Bus
+  incoming messages 6, Event Grid published 7 / delivered 6, Azure OpenAI requests 5; worker
+  executions 6. Terraform reported *No changes* afterwards.
 
 ## Latency and the cold-start trade-off
 

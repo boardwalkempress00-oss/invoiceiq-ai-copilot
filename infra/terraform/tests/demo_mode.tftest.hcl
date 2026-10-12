@@ -12,7 +12,7 @@ variables {
   ai_price_input_per_1m  = "0.40"
   ai_price_output_per_1m = "1.60"
   budget_alert_email     = null
-  # Pinned like production; `terraform test` also loads a local terraform.tfvars.
+  # Pinned like production. (Production values live in production.tfvars, which tests never load.)
   ai_provider              = "mock"
   event_processing_enabled = true
   async_processing_enabled = false

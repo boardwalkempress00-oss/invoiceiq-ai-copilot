@@ -1,8 +1,8 @@
 # Plan-only tests: independent web/worker images and safe defaults. Mocked providers.
 #   terraform test
 #
-# Default checks are definitive in CI, which has no terraform.tfvars. Locally, `terraform test`
-# also loads terraform.tfvars, so a value set there can mask a default.
+# These checks see the real defaults: production values live in production.tfvars, which
+# `terraform test` does not load (it auto-loads only terraform.tfvars and *.auto.tfvars).
 
 mock_provider "azurerm" {}
 mock_provider "random" {}

@@ -1,4 +1,6 @@
-# Copy to terraform.tfvars (git-ignored) and fill in. Contains no secrets.
+# Copy to production.tfvars (git-ignored) and fill in. Contains no secrets.
+# Use it explicitly: terraform plan -var-file=production.tfvars. It is deliberately not named
+# terraform.tfvars, which Terraform (and `terraform test`) would load automatically.
 
 # subscription_id = "00000000-0000-0000-0000-000000000000"   # or export ARM_SUBSCRIPTION_ID
 location        = "swedencentral"
