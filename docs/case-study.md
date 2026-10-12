@@ -99,7 +99,7 @@ correct** — it only explains decisions made by deterministic code.
 | Azure OpenAI answers with citations | 5 requests in an IP-restricted test window | Verified in Azure (controlled) |
 | Public demo deployment | One web-app update from a reviewed plan; one scenario smoke-tested; Service Bus, Event Grid and Azure OpenAI counters unchanged | Verified in Azure |
 | Duplicates, lease takeover, retries, dead-lettering, lock renewal | Deterministic tests with Service Bus semantics | Verified locally |
-| Overall test suite | 526 tests (95% line coverage), 24 Terraform plan tests | Verified locally |
+| Overall test suite | 527 tests (95% line coverage), 24 Terraform plan tests | Verified locally |
 
 ## 7. Cost-aware design
 

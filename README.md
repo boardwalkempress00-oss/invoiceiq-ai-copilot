@@ -17,6 +17,9 @@ Invoices can also be processed by an event-driven pipeline on Azure that scales 
 
 ![Start here page](docs/screenshots/start-here.png)
 
+<sub>Screenshots in this README were captured from a local run (mock AI, demo mode) of the same
+code; they are not production screenshots.</sub>
+
 ## 60-second tour
 
 1. **Try processing** — click *Try InvoiceIQ*, pick one of ten fictional invoices (wrong VAT,
@@ -43,7 +46,7 @@ Invoices can also be processed by an event-driven pipeline on Azure that scales 
   invoice text.
 - **Cost awareness.** Scale to zero, Service Bus Basic, a reserve-and-settle AI budget that fails
   closed, and a mock AI provider for the public app.
-- **Engineering discipline.** 526 automated tests (95% coverage), 24 Terraform plan tests,
+- **Engineering discipline.** 527 automated tests (95% coverage), 24 Terraform plan tests,
   infrastructure as code, CI gates, and documented evidence instead of claims.
 
 **Read more:** [architecture case study](docs/case-study.md) ·
@@ -183,7 +186,7 @@ read-only mode that still shows the verified validation results.
 | Container | Multi-stage Dockerfile, `tini` + Python supervisor, non-root |
 | Infrastructure | Terraform (AzureRM 4.81 + AzAPI 2.13): Container Apps and Jobs, Azure OpenAI, Storage, Event Grid, Service Bus, Log Analytics, managed identities |
 | CI/CD | GitHub Actions: ruff, pytest + Azurite, Terraform test, Docker smoke test; manual multi-arch image publishing; OIDC deploy (disabled) |
-| Quality | pytest (526 tests, 95% coverage), ruff, `terraform test` (24 runs, mocked providers) |
+| Quality | pytest (527 tests, 95% coverage), ruff, `terraform test` (24 runs, mocked providers) |
 
 ## Status and evidence
 
@@ -341,12 +344,12 @@ about 10 minutes, then create the subscription. A reusable compatibility test li
 | Unit | 178 | Every validation rule incl. boundaries and rounding, BM25, prompts, citations, providers (fake SDK client), cost accounting, supervisor |
 | Processing | 112 | Event parsing, Service Bus peek-lock semantics, leases, duplicates, lock expiry, crash recovery, retries, dead-lettering, concurrency; the public demo's catalog, bounds and isolation from Azure |
 | API | 69 | All endpoints incl. submissions and demo, feature-flag matrix, error envelopes, correlation IDs, read-only modes |
-| Frontend | 113 | Presentation logic, API client, every Streamlit page via `AppTest`, navigation by feature flag, escaping of untrusted invoice text |
+| Frontend | 114 | Presentation logic, API client, every Streamlit page via `AppTest`, navigation by feature flag, escaping of untrusted invoice text |
 | Integration | 54 | Usage and submission stores and Blob Storage on **Azurite**: ETags, atomic commits, concurrency, end-to-end worker path |
 | Terraform | 24 | Plan tests with mocked providers: scaling, keys disabled, least-privilege role scopes, Service Bus Basic, private containers, platform-only scaler identity, feature flags, safe defaults, independent web/worker images |
 
 ```bash
-uv run pytest --cov=invoiceiq        # 526 passed, 95% line coverage
+uv run pytest --cov=invoiceiq        # 527 passed, 95% line coverage
 # Azurite tests run when the emulator is up (CI requires it):
 docker run -d -p 127.0.0.1:10000:10000 -p 127.0.0.1:10002:10002 \
   mcr.microsoft.com/azure-storage/azurite:3.35.0 \

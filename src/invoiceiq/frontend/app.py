@@ -16,7 +16,7 @@ st.set_page_config(
     page_title="InvoiceIQ — AI Finance Operations Copilot",
     page_icon=":material/receipt_long:",
     layout="wide",
-    initial_sidebar_state="expanded",
+    initial_sidebar_state="auto",  # open on desktop, collapsed on phones
 )
 components.inject_css()
 

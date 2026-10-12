@@ -218,6 +218,19 @@ def test_frontend_does_not_import_backend_logic():
                 assert not name.startswith(forbidden), f"{path.name} imports {name}"
 
 
+def test_sidebar_starts_collapsed_on_small_screens():
+    # "auto" shows the sidebar on desktop and collapses it on phones, where an expanded sidebar
+    # covers the page. AppTest has no viewport, so this checks the configuration itself.
+    tree = ast.parse((Path(FRONTEND_DIR) / "app.py").read_text(encoding="utf-8"))
+    calls = [
+        n for n in ast.walk(tree)
+        if isinstance(n, ast.Call) and getattr(n.func, "attr", "") == "set_page_config"
+    ]  # fmt: skip
+    assert len(calls) == 1
+    kwargs = {k.arg: k.value.value for k in calls[0].keywords if isinstance(k.value, ast.Constant)}
+    assert kwargs["initial_sidebar_state"] == "auto"
+
+
 def test_no_legacy_pages_directory():
     # A pages/ folder next to app.py makes Streamlit's legacy navigation bypass app.py in the
     # browser (AppTest does not reproduce this), losing the sidebar, styles and layout.

@@ -19,7 +19,7 @@ described; cost figures are **estimates** from list prices unless stated otherwi
 | Deterministic validation, BM25 citations, mock AI, usage limiter on Table Storage | Verified in Azure |
 | Azure OpenAI (gpt-4.1-mini) answers with citations | Verified in Azure — controlled test only (5 requests); production runs in mock mode |
 | Upload → Blob Storage → Event Grid → Service Bus Basic → Container Apps Job → result | Verified in Azure — 6 submissions (E1, E2); switched off for the public |
-| Duplicate handling, leases, retries, dead-lettering, lock renewal | Verified locally (99 processing tests incl. concurrency and failure scenarios) — **not exercised in Azure** |
+| Duplicate handling, leases, retries, dead-lettering, lock renewal | Verified locally (99 processing tests at the time of Phase E2, incl. concurrency and failure scenarios) — **not exercised in Azure** |
 | Public demo of invoice processing (*Try processing*) | Deployed 2026-10-12 — **simulated** in memory; uses no Azure storage or messaging (Phase F2) |
 
 The public site runs with `AI_PROVIDER=mock` and `ASYNC_PROCESSING_ENABLED=false`. Live AI and
