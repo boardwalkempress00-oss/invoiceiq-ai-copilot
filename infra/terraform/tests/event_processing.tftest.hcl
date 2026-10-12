@@ -370,7 +370,7 @@ run "enabled_infrastructure_is_least_privilege_and_cheap" {
       azapi_resource.worker_job[0].body.properties.template.containers[0].command == ["python", "-m", "invoiceiq.worker"],
       azapi_resource.worker_job[0].body.properties.template.containers[0].resources.cpu == 0.25,
       azapi_resource.worker_job[0].body.properties.template.containers[0].resources.memory == "0.5Gi",
-      azapi_resource.worker_job[0].body.properties.template.containers[0].image == var.container_image,
+      azapi_resource.worker_job[0].body.properties.template.containers[0].image == var.container_image, # worker_container_image unset
     ])
     error_message = "Worker: same image, worker command, 0.25 vCPU / 0.5 GiB."
   }

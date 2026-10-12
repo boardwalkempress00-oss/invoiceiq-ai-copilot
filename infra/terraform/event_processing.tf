@@ -33,6 +33,9 @@ locals {
   servicebus_namespace      = "sb-${local.base}"
   servicebus_namespace_fqdn = "${local.servicebus_namespace}.servicebus.windows.net"
 
+  # The worker's image defaults to the web app's, so existing configurations plan unchanged.
+  worker_image = coalesce(var.worker_container_image, var.container_image)
+
   # Added to the web app only when the infrastructure exists. ASYNC_PROCESSING_ENABLED stays
   # "false" until var.async_processing_enabled is set.
   async_app_env = local.ep ? {
@@ -447,7 +450,7 @@ resource "azapi_resource" "worker_job" {
         containers = [
           {
             name    = "worker"
-            image   = var.container_image
+            image   = local.worker_image
             command = ["python", "-m", "invoiceiq.worker"]
             resources = {
               cpu    = 0.25

@@ -6,6 +6,11 @@ location        = "swedencentral"
 
 # Digest from the "Publish image" workflow run summary.
 container_image = "ghcr.io/<github-owner>/invoiceiq-ai-copilot@sha256:<digest>"
+# Optional: a different image for the worker job (defaults to container_image).
+# worker_container_image = "ghcr.io/<github-owner>/invoiceiq-ai-copilot@sha256:<digest>"
+
+# mock (default) = offline answers, no model calls. azure_openai = live answers (opt in).
+# ai_provider = "mock"
 
 # VERIFY before applying — availability and versions change:
 #   az cognitiveservices model list -l swedencentral \
@@ -27,3 +32,6 @@ session_request_limit      = 10
 # Free budget alert on the resource group (alerts only).
 # budget_alert_email    = "you@example.com"
 # monthly_budget_amount = 10
+
+# Simulated, in-memory processing demo (no Azure storage or messaging). Off by default.
+# demo_mode_enabled = false
