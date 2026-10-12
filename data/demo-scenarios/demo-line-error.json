@@ -1,0 +1,41 @@
+{
+  "invoice_id": "demo-line-error",
+  "invoice_number": "DEMO-2026-1006",
+  "vendor": {
+    "name": "Kildevang Print & Sign ApS",
+    "vat_number": "DEMO-VAT-1006",
+    "country": "DK",
+    "email": "invoices@kildevang.example"
+  },
+  "buyer": {
+    "name": "Aurora Nordic Trading ApS",
+    "country": "DK",
+    "cost_center": "CC-310 Demo"
+  },
+  "issue_date": "2026-09-15",
+  "due_date": "2026-10-15",
+  "currency": "DKK",
+  "purchase_order": "PO-71006",
+  "line_items": [
+    {
+      "line_id": "1",
+      "description": "Roll-up banners",
+      "quantity": "5",
+      "unit_price": "640.00",
+      "line_total": "3400.00"
+    },
+    {
+      "line_id": "2",
+      "description": "Flyers (1,000 pcs)",
+      "quantity": "3",
+      "unit_price": "410.00",
+      "line_total": "1230.00"
+    }
+  ],
+  "subtotal": "4630.00",
+  "vat_rate": "0.25",
+  "vat_amount": "1157.50",
+  "total": "5787.50",
+  "approval": null,
+  "notes": "Fictional demo scenario. "
+}

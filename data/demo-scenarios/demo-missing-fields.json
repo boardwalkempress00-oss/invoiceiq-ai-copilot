@@ -1,0 +1,41 @@
+{
+  "invoice_id": "demo-missing-fields",
+  "invoice_number": "DEMO-2026-1010",
+  "vendor": {
+    "name": "Mosegård Supplies ApS",
+    "vat_number": "DEMO-VAT-1010",
+    "country": "DK",
+    "email": "invoices@mosegård.example"
+  },
+  "buyer": {
+    "name": "Aurora Nordic Trading ApS",
+    "country": "DK",
+    "cost_center": "CC-310 Demo"
+  },
+  "issue_date": null,
+  "due_date": "2026-10-15",
+  "currency": "DKK",
+  "purchase_order": "PO-71010",
+  "line_items": [
+    {
+      "line_id": "1",
+      "description": "Safety gloves (pairs)",
+      "quantity": "50",
+      "unit_price": "38.00",
+      "line_total": "1900.00"
+    },
+    {
+      "line_id": "2",
+      "description": "Hi-vis vests",
+      "quantity": "10",
+      "unit_price": null,
+      "line_total": null
+    }
+  ],
+  "subtotal": null,
+  "vat_rate": "0.25",
+  "vat_amount": "672.50",
+  "total": "3362.50",
+  "approval": null,
+  "notes": "Fictional demo scenario. "
+}

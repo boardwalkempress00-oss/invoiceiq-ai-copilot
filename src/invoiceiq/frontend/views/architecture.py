@@ -98,8 +98,10 @@ st.dataframe(
         {"Component": "Retries, lease takeover, dead-lettering",
          "Status": "✓ Verified locally (automated tests)",
          "Evidence": "Deterministic tests with Service Bus semantics; not exercised in Azure."},
-        {"Component": "Public demo of invoice processing", "Status": "○ Planned",
-         "Evidence": "Simulated scenario gallery, clearly labelled — not built yet."},
+        {"Component": "Public demo of invoice processing",
+         "Status": "✓ Verified locally (automated tests)",
+         "Evidence": "Simulated scenario gallery with in-memory stand-ins, labelled as simulated; "
+                     "uses no Azure storage or messaging. Not yet deployed."},
         {"Component": "Azure AI Search", "Status": "○ Planned",
          "Evidence": "Could replace BM25 behind the existing PolicyRetriever interface."},
     ],

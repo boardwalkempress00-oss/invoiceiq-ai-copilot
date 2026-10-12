@@ -14,10 +14,12 @@ from invoiceiq.frontend.presentation import AiMode, ai_mode, money, status_style
 # Page scripts live in views/, not pages/: a pages/ folder would trigger Streamlit's legacy
 # automatic navigation and bypass app.py (sidebar, styles and layout).
 PAGE_PATHS = {
+    "home": "views/home.py",
     "dashboard": "views/dashboard.py",
     "analysis": "views/analysis.py",
     "chat": "views/chat.py",
     "process": "views/process.py",
+    "demo": "views/demo.py",
     "architecture": "views/architecture.py",
     "observability": "views/observability.py",
 }

@@ -115,6 +115,15 @@ class Settings(BaseSettings):
     # Local simulation only: delay before the simulated event reaches the worker.
     local_pipeline_delay_seconds: float = Field(default=1.5, ge=0, le=30)
 
+    # --- Public demo (simulated processing of predefined fictional scenarios) ---
+    # Independent of ASYNC_PROCESSING_ENABLED: the demo runs the real processing code entirely
+    # in memory and never touches Blob Storage, Service Bus or Table Storage.
+    demo_mode_enabled: bool = False
+    demo_session_daily_limit: int = Field(default=30, ge=0, le=1_000)
+    demo_global_daily_limit: int = Field(default=2_000, ge=0, le=100_000)
+    demo_max_runs_in_memory: int = Field(default=200, ge=10, le=5_000)
+    demo_run_ttl_seconds: int = Field(default=3_600, ge=60, le=86_400)
+
     # --- Worker (Container Apps Job) ---
     servicebus_namespace: str | None = None  # e.g. sb-invoiceiq-xxxx.servicebus.windows.net
     servicebus_queue: str = "invoice-events"
@@ -138,6 +147,14 @@ class Settings(BaseSettings):
     @property
     def policy_path(self) -> Path:
         return self.data_dir / "policies" / "purchasing_policy.md"
+
+    @property
+    def demo_scenarios_dir(self) -> Path:
+        return self.data_dir / "demo-scenarios"
+
+    @property
+    def production_reference_path(self) -> Path:
+        return self.data_dir / "evidence" / "production-reference.json"
 
     @property
     def expected_blob_host(self) -> str | None:

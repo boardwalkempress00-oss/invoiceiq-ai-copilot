@@ -1,0 +1,25 @@
+{
+  "version": 1,
+  "label": "Verified in Azure — historical test run, not live",
+  "source": "docs/evidence/production-verification.md",
+  "run": "Phase E1",
+  "date": "2026-10-12",
+  "invoice": "KFS-2026-0203 (fictional sample)",
+  "result": "Requires Review (CALC-003, CALC-004)",
+  "steps": [
+    {"step": "Submission accepted; file stored in Blob Storage", "offset_seconds": 0.0},
+    {"step": "BlobCreated delivered to the Service Bus queue", "offset_seconds": 0.8},
+    {"step": "KEDA detects the message and starts a worker job from zero", "offset_seconds": 4.5},
+    {"step": "Worker container started (image pulled, container created)", "offset_seconds": 26.6},
+    {"step": "Invoice validated and result stored", "offset_seconds": 29.3}
+  ],
+  "summary": {
+    "submissions_tested": 6,
+    "upload_to_result_seconds_min": 24.5,
+    "upload_to_result_seconds_max": 35.7,
+    "duplicates": 0,
+    "retries": 0,
+    "dead_letters": 0,
+    "azure_openai_requests": 0
+  }
+}

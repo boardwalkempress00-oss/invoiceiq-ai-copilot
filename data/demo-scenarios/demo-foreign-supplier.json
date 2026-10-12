@@ -1,0 +1,34 @@
+{
+  "invoice_id": "demo-foreign-supplier",
+  "invoice_number": "DEMO-2026-1008",
+  "vendor": {
+    "name": "Rheinfeld Analytics GmbH",
+    "vat_number": "DEMO-VAT-1008",
+    "country": "DE",
+    "email": "invoices@rheinfeld.example"
+  },
+  "buyer": {
+    "name": "Aurora Nordic Trading ApS",
+    "country": "DK",
+    "cost_center": "CC-310 Demo"
+  },
+  "issue_date": "2026-09-15",
+  "due_date": "2026-10-15",
+  "currency": "DKK",
+  "purchase_order": "PO-71008",
+  "line_items": [
+    {
+      "line_id": "1",
+      "description": "Data analysis workshop",
+      "quantity": "2",
+      "unit_price": "4200.00",
+      "line_total": "8400.00"
+    }
+  ],
+  "subtotal": "8400.00",
+  "vat_rate": "0.00",
+  "vat_amount": "0.00",
+  "total": "8400.00",
+  "approval": null,
+  "notes": "Fictional demo scenario. "
+}

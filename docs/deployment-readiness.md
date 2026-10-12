@@ -1,5 +1,12 @@
 # Deployment readiness review — InvoiceIQ Milestone 1
 
+> **Historical document.** This is the pre-deployment assessment as written on 2026-10-10, before
+> any Azure resource existed. It is kept unchanged as a record of what was known at the time.
+> Since then the infrastructure has been applied and tested in Azure; for what has actually been
+> deployed and verified, see
+> [evidence/production-verification.md](evidence/production-verification.md). Statements below
+> such as "nothing has been provisioned" describe the state on 2026-10-10, not today.
+
 *Prepared 2026-10-10, before any Azure resource exists. Nothing has been provisioned, deployed or
 billed. Prices: Azure Retail Prices API, region Sweden Central, USD, retrieved 2026-10-10 —
 re-check before applying; your invoice is in your billing currency and may differ.*

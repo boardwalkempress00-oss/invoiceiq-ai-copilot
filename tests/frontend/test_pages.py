@@ -28,7 +28,7 @@ def button(at, label: str):
 
 
 def test_dashboard_renders_invoices_and_kpis(run_page):
-    at = run_page()
+    at = run_page("dashboard")
     assert not at.exception
     metrics = {m.label: m.value for m in at.metric}
     assert metrics == {"Invoices": "3", "✓ Passed": "1", "! Requires Review": "1", "⚑ Flagged": "1"}
@@ -38,7 +38,7 @@ def test_dashboard_renders_invoices_and_kpis(run_page):
 
 
 def test_dashboard_card_opens_analysis_for_that_invoice(run_page):
-    at = run_page()
+    at = run_page("dashboard")
     next(b for b in at.button if b.key == "open-inv-003").click().run()
     assert not at.exception
     assert at.session_state["selected_invoice"] == "inv-003"
@@ -53,7 +53,7 @@ def test_dashboard_shows_friendly_error_when_backend_down(run_page):
     offline = ApiClient(
         http=httpx.Client(base_url="http://x", transport=httpx.MockTransport(refuse))
     )
-    at = run_page(client=offline)
+    at = run_page("dashboard", client=offline)
     assert not at.exception
     assert any("not reachable" in e.value for e in at.error)
 
@@ -165,7 +165,7 @@ def test_architecture_distinguishes_evidence_levels(run_page):
     assert statuses["Background worker (Container Apps Job)"] == "✓ Verified in Azure"
     assert statuses["Azure OpenAI provider"] == "✓ Verified in Azure (controlled)"
     assert statuses["Retries, lease takeover, dead-lettering"].startswith("✓ Verified locally")
-    assert statuses["Public demo of invoice processing"] == "○ Planned"
+    assert statuses["Public demo of invoice processing"] == "✓ Verified locally (automated tests)"
     assert statuses["Azure AI Search"] == "○ Planned"
     # Every status is one of the three evidence levels; nothing is left unlabelled.
     assert all(
