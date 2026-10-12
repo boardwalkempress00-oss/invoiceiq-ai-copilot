@@ -59,6 +59,11 @@ h1, h2, h3 { color: var(--iq-ink); letter-spacing: -0.01em; }
   padding: 8px 12px; border-radius: 0 8px 8px 0; color: var(--iq-ink); font-size: .9rem;
 }
 .iq-kv { font-size: .9rem; color: var(--iq-ink); }
+.iq-h4 { font-size: 1.25rem; font-weight: 650; color: var(--iq-ink); margin: .2rem 0; }
+.iq-finding p { margin: .35rem 0; color: var(--iq-ink); font-size: .93rem; }
+.iq-finding-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px 16px;
+  font-size: .9rem; margin: .35rem 0; }
+.iq-list { margin: .25rem 0 .5rem 1.1rem; padding: 0; font-size: .9rem; }
 .iq-kv b { color: var(--iq-muted); font-weight: 600; }
 </style>
 """
@@ -70,6 +75,52 @@ def inject_css() -> None:
 
 def esc(value: Any) -> str:
     return html.escape("" if value is None else str(value))
+
+
+# --- Untrusted values ------------------------------------------------------------------------
+# Anything that can come from a submitted invoice — invoice numbers, vendor names, line IDs,
+# currency codes, schema field names, and validation messages that quote them — is rendered as
+# escaped HTML, never as Markdown, so it cannot become a link, an image, formatting or markup.
+
+_MD_PUNCTUATION = set("\\`*_{}[]()#+-.!|<>~:\"'&=$%^@,;/?")
+
+
+def md_literal(value: Any) -> str:
+    """Backslash-escape a value for Streamlit widgets that only accept Markdown (alerts).
+
+    Every ASCII punctuation character is escaped, so no Markdown construct, HTML tag or
+    autolink can form; newlines collapse to spaces.
+    """
+    text = " ".join(("" if value is None else str(value)).split())
+    return "".join(f"\\{c}" if c in _MD_PUNCTUATION else c for c in text)
+
+
+def untrusted_html(value: Any, css_class: str = "iq-sub") -> str:
+    return f'<div class="{css_class}">{esc(value)}</div>'
+
+
+def finding_html(finding: dict[str, Any]) -> str:
+    """One validation finding as escaped HTML (title, ID, description, values, action)."""
+    expected = finding.get("expected_value") or "—"
+    actual = finding.get("actual_value") or "—"
+    return (
+        '<div class="iq-finding">'
+        f"<div><b>{esc(finding.get('title'))}</b> · "
+        f"<code>{esc(finding.get('finding_id'))}</code></div>"
+        f"<p>{esc(finding.get('description'))}</p>"
+        '<div class="iq-finding-grid">'
+        f"<div><b>Expected</b><br>{esc(expected)}</div>"
+        f"<div><b>Actual</b><br>{esc(actual)}</div>"
+        f"<div><b>Policy</b><br><code>{esc(finding.get('policy_reference'))}</code></div>"
+        "</div>"
+        f"<p><b>Recommended action:</b> {esc(finding.get('recommended_action'))}</p>"
+        "</div>"
+    )
+
+
+def details_html(details: list[Any]) -> str:
+    items = "".join(f"<li><code>{esc(d)}</code></li>" for d in details)
+    return f'<ul class="iq-list">{items}</ul>'
 
 
 def hero(title: str, subtitle: str, tag: str | None = None) -> None:

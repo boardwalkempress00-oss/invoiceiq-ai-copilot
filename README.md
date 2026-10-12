@@ -10,8 +10,10 @@ the verified results, cites its evidence, and drafts next steps for a person to 
 
 ![Dashboard](docs/screenshots/dashboard.png)
 
-**Status:** Milestone 1 complete and deployment-ready. **Not yet deployed** — a public URL will
-be added after the Azure deployment is approved.
+**Status:** deployed on Azure Container Apps (Sweden Central). The public app runs with the
+offline mock AI provider; live Azure OpenAI and the event-driven invoice pipeline are built,
+deployed and **verified in controlled tests**, and switched off for public visitors. Evidence:
+[docs/evidence/production-verification.md](docs/evidence/production-verification.md).
 
 ---
 
@@ -23,7 +25,7 @@ be added after the Azure deployment is approved.
 [Docker](#docker) · [Deploy to Azure](#deploy-to-azure-terraform) ·
 [Security and cost controls](#security-and-cost-controls) · [Testing](#testing) ·
 [Design decisions](#key-design-decisions-and-trade-offs) · [Limitations](#known-limitations) ·
-[Milestone 2](#milestone-2-event-driven-processing-planned)
+[Event-driven processing](#event-driven-processing) · [Evidence](docs/evidence/production-verification.md)
 
 ## The business problem
 
@@ -50,7 +52,11 @@ they are **unreliable at arithmetic** and can invent facts. InvoiceIQ splits the
 - **AI Chat** — suggested questions, per-invoice chat history, cited evidence, and a separate
   "verified facts" panel produced by the validation engine, never by the model. Clear labels show
   whether an answer came from Azure OpenAI, the offline mock, or read-only mode.
-- **Architecture** — what is built now and what is planned.
+- **Process Invoice** — submit a fictional invoice and follow it through Blob Storage, Event Grid,
+  Service Bus and a background worker. Deployed and verified, but **off by default** in public
+  (see [Event-driven processing](#event-driven-processing)).
+- **Architecture** — what is deployed, how each part was verified, measured numbers and
+  security boundaries.
 - **Observability** — real per-session latency, AI latency, token usage and estimated cost.
 
 | Invoice Analysis | AI Chat |
@@ -82,9 +88,18 @@ flowchart LR
         api --> lim["Usage limiter<br/>reserve → settle"]
     end
 
-    api -- "managed identity" --> aoai["Azure OpenAI"]
+    api -- "managed identity" --> aoai["Azure OpenAI<br/>(mock in production)"]
     lim -- "managed identity · ETags" --> tbl[("Azure Table Storage<br/>daily quotas")]
     container -. "stdout JSON logs" .-> law["Log Analytics"]
+
+    subgraph ep["Event-driven processing · deployed, off by default"]
+        blob[("Blob container<br/>invoice-uploads")] -- "BlobCreated" --> eg["Event Grid"]
+        eg -- "managed identity" --> sb["Service Bus Basic<br/>queue + dead-letter"]
+        sb -- "KEDA" --> job["Container Apps Job<br/>worker (0–3)"]
+        job --> jobs[("Table invoicejobs<br/>status + results")]
+    end
+    api -- "upload" --> blob
+    api -- "status" --> jobs
 ```
 
 **A chat question, step by step:** the API loads the invoice and validates it → retrieves the
@@ -107,29 +122,33 @@ read-only mode that still shows the verified validation results.
 | AI | Azure OpenAI via the official OpenAI SDK (GA v1 endpoint), Entra ID auth; offline mock provider |
 | Retrieval | BM25, implemented in ~100 lines (no vector DB) |
 | Usage limiting | Azure Table Storage with ETag optimistic concurrency; SQLite/in-memory for local dev |
+| Event-driven processing | Blob Storage, Event Grid (system topic, managed-identity delivery), Service Bus **Basic**, Container Apps Job scaled by KEDA |
 | Container | Multi-stage Dockerfile, `tini` + Python supervisor, non-root |
-| Infrastructure | Terraform (AzureRM 4.81 + AzAPI 2.13): Container Apps, Azure OpenAI, Storage, Log Analytics, managed identity |
-| CI/CD | GitHub Actions: ruff, pytest + Azurite, Terraform test, Docker smoke test; OIDC deploy (disabled) |
-| Quality | pytest (282 tests, 95% coverage), ruff, `terraform test` with mocked providers |
+| Infrastructure | Terraform (AzureRM 4.81 + AzAPI 2.13): Container Apps and Jobs, Azure OpenAI, Storage, Event Grid, Service Bus, Log Analytics, managed identities |
+| CI/CD | GitHub Actions: ruff, pytest + Azurite, Terraform test, Docker smoke test; manual multi-arch image publishing; OIDC deploy (disabled) |
+| Quality | pytest (480 tests, 95% coverage), ruff, `terraform test` (15 runs, mocked providers) |
 
-## Implemented vs planned
+## Status and evidence
+
+**Verified in Azure** = observed in the production subscription; **verified locally** = covered by
+automated tests; **planned** = not built. Details and measurements:
+[docs/evidence/production-verification.md](docs/evidence/production-verification.md).
 
 | Component | Status |
 |---|---|
-| Deterministic validation engine (12 rules) | ✅ Implemented |
-| BM25 policy retrieval with stable citations | ✅ Implemented |
-| FastAPI backend (health, invoices, validate, chat, policy) | ✅ Implemented |
-| Streamlit UI (5 pages) | ✅ Implemented |
-| Mock AI provider (offline, deterministic) | ✅ Implemented |
-| Azure OpenAI provider (Entra ID, timeouts, bounded retries) | ✅ Implemented — tested with a fake client, **not yet called live** |
-| Persistent usage limiter on Azure Table Storage | ✅ Implemented — tested on Azurite, **not yet on Azure** |
-| Docker image + Compose | ✅ Implemented and verified locally |
-| Terraform | ✅ Written, validated and plan-tested — **not applied** |
-| CI workflow | ✅ Written and linted (`actionlint`) — runs once pushed to GitHub |
+| Deterministic validation engine (12 rules) | ✅ Verified in Azure |
+| BM25 policy retrieval with stable citations | ✅ Verified in Azure |
+| FastAPI backend and Streamlit UI | ✅ Verified in Azure (Container Apps, scale to zero) |
+| Mock AI provider | ✅ Verified in Azure — production default |
+| Azure OpenAI provider (Entra ID, timeouts, bounded retries) | ✅ Verified in Azure in a controlled, IP-restricted test (5 requests); production stays in mock mode |
+| Persistent usage limiter on Azure Table Storage | ✅ Verified in Azure |
+| Event-driven processing (Blob → Event Grid → Service Bus Basic → Container Apps Job) | ✅ Verified in Azure — 6 test submissions; **off by default** |
+| Retries, lease takeover, lock renewal, dead-lettering | 🧪 Verified locally (automated tests); not exercised in Azure |
+| Terraform (incl. event-processing resources) | ✅ Applied; plan reports no drift |
+| CI, image publishing (GHCR, amd64 + arm64) | ✅ In use |
 | Deploy workflow (OIDC) | ✅ Written — **disabled** until credentials are reviewed |
-| Publish-image workflow (GHCR) | ✅ Manual; publishes only commits whose CI passed |
-| Event Grid, Service Bus, Blob ingestion, background worker | ⏳ Planned (Milestone 2) |
-| Azure AI Search, Document Intelligence, authentication | ⏳ Planned (later milestones) |
+| Public demo of invoice processing (simulated scenario gallery) | ⏳ Planned |
+| Azure AI Search, Document Intelligence, authentication | ⏳ Planned |
 
 ## Run locally
 
@@ -207,6 +226,13 @@ OIDC deploy identity.
 Offline checks (no Azure credentials): `terraform validate` and `terraform test` (plan tests with
 mocked providers).
 
+**Event-driven processing** is created only with `event_processing_enabled = true` (requires the
+`Microsoft.EventGrid` and `Microsoft.ServiceBus` resource providers), and exposed in the app only
+with `async_processing_enabled = true`. Event Grid validates its managed identity when the
+subscription is created, so on a first deployment create the dead-letter role assignment, wait
+about 10 minutes, then create the subscription. A reusable compatibility test lives in
+[infra/manual-tests/eventgrid-servicebus-basic](infra/manual-tests/eventgrid-servicebus-basic).
+
 ## Security and cost controls
 
 **AI usage (public demo protection)**
@@ -229,34 +255,42 @@ mocked providers).
 
 - No secrets anywhere: managed identity for Azure OpenAI and Table Storage; API keys and storage
   shared keys are disabled in Terraform. GitHub deploys use OIDC federation.
-- Least privilege: *Cognitive Services OpenAI User* on the AI account and *Storage Table Data
-  Contributor* on the one table.
+- Least privilege: every role assignment is scoped to a single resource. The web app, the worker
+  and the KEDA scaler have **separate** managed identities; the worker has no Azure OpenAI role,
+  and the scaler identity cannot be used by container code. Event Grid delivers and dead-letters
+  with its own identity (dead-letters go to a dedicated storage account).
 - Prompt-injection resistance: instructions, evidence (JSON, labelled as data) and the question
   are separate messages; look-alike tags are stripped; citations are verified after generation;
   the facts panel never comes from the model.
 - Safe errors: no stack traces or submitted values in responses; correlation IDs link the UI to
   structured JSON logs; prompts and questions are never logged.
-- No file uploads; input validated with Pydantic and length limits.
+- Invoice upload (event-driven mode only, off in public): JSON only, ≤ 64 KB, schema-validated,
+  separate daily allowance, private storage, 7-day retention; invoice-supplied text is rendered as
+  escaped text, never as Markdown or HTML (security regression tests).
+- Other input is validated with Pydantic and length limits.
 
 ## Testing
 
 | Suite | Tests | What it covers |
 |---|---:|---|
-| Unit | 166 | Every validation rule incl. boundaries and rounding, BM25, prompts, citations, providers (fake SDK client), cost accounting, supervisor |
-| API | 29 | All endpoints, error envelopes, correlation IDs, read-only modes |
-| Frontend | 47 | Presentation logic, API client, every Streamlit page via `AppTest` against the real API |
-| Integration | 40 | Usage-store contract on memory, SQLite and **Azure Table (Azurite)**: ETags, atomic multi-row commits, concurrency across separate clients, budgets, day rollover, fail-closed |
-| Terraform | 9 | Plan tests with mocked providers: scaling, sizes, Consumption-only profile, HTTPS-only, keys disabled, table without ACLs, no secrets, OIDC scope, no provisioned throughput |
+| Unit | 178 | Every validation rule incl. boundaries and rounding, BM25, prompts, citations, providers (fake SDK client), cost accounting, supervisor |
+| Processing | 99 | Event parsing, Service Bus peek-lock semantics, leases, duplicates, lock expiry, crash recovery, retries, dead-lettering, concurrency, delivery-count normalisation |
+| API | 49 | All endpoints incl. submissions, error envelopes, correlation IDs, read-only modes, isolation from the AI allowance |
+| Frontend | 100 | Presentation logic, API client, every Streamlit page via `AppTest`, escaping of untrusted invoice text |
+| Integration | 54 | Usage and submission stores and Blob Storage on **Azurite**: ETags, atomic commits, concurrency, end-to-end worker path |
+| Terraform | 15 | Plan tests with mocked providers: scaling, keys disabled, least-privilege role scopes, Service Bus Basic, private containers, platform-only scaler identity, feature flags |
 
 ```bash
-uv run pytest --cov=invoiceiq        # 282 passed, 95% line coverage
+uv run pytest --cov=invoiceiq        # 480 passed, 95% line coverage
 # Azurite tests run when the emulator is up (CI requires it):
-docker run -d -p 127.0.0.1:10002:10002 mcr.microsoft.com/azure-storage/azurite:3.35.0 \
-  azurite-table --tableHost 0.0.0.0 --skipApiVersionCheck --loose
+docker run -d -p 127.0.0.1:10000:10000 -p 127.0.0.1:10002:10002 \
+  mcr.microsoft.com/azure-storage/azurite:3.35.0 \
+  azurite --blobHost 0.0.0.0 --tableHost 0.0.0.0 --skipApiVersionCheck --loose
 cd infra/terraform && terraform init -backend=false && terraform test
 ```
 
-No test calls Azure or a live model.
+No automated test calls Azure or a live model. Production behaviour was verified separately,
+in controlled and documented runs — see the [evidence](docs/evidence/production-verification.md).
 
 ## Key design decisions and trade-offs
 
@@ -275,7 +309,12 @@ No test calls Azure or a live model.
 
 ## Known limitations
 
-- Deployed with the mock provider; the live Azure OpenAI path has not yet run against real Azure.
+- The public app runs with the mock provider. Live Azure OpenAI was verified only in a short,
+  IP-restricted test (5 requests).
+- Event-driven processing is verified with 6 test submissions but switched off for the public.
+  Retries, lease takeover and dead-lettering are covered by automated tests, not yet exercised in
+  Azure. Processing from upload to result takes 24.5–35.7 s, almost all of it the worker
+  starting from zero.
 - Per-session limits are per browser session; reloading starts a new session. The **global**
   request and cost caps are the hard limits.
 - Streamlit holds a WebSocket per open tab, so an idle tab would keep the replica running. An
@@ -287,28 +326,41 @@ No test calls Azure or a live model.
   visit to the URL shows the browser's own loading indicator.
 - Observability is per browser session; Azure Monitor dashboards are not yet built.
 - Mock answers are templates; only the live model writes free-form text.
-- Fictional data only; no authentication, uploads or real financial integrations.
+- Fictional data only; no authentication, no public uploads, no real financial integrations.
 
-## Milestone 2: event-driven processing (planned)
+## Event-driven processing
 
-Milestone 1 is **synchronous**: the user waits while one HTTP request validates and answers.
-That is ideal for three bundled invoices. Real AP teams receive invoices continuously, so
-Milestone 2 makes ingestion **asynchronous**:
+Chat and analysis are **synchronous**. Real accounts-payable teams receive invoices continuously,
+so ingestion can also run **asynchronously** — deployed on Azure and verified, off by default:
 
 ```mermaid
 flowchart LR
-    upload["Invoice upload"] --> blob[("Blob Storage")]
-    blob -- "BlobCreated" --> eg["Event Grid"]
-    eg --> sb["Service Bus queue"]
-    sb --> worker["Background worker<br/>InvoiceService.process()"]
-    sb -. "after retries" .-> dlq["Dead-letter queue"]
-    worker --> jobs[("Table Storage<br/>job status")]
+    upload["Process Invoice<br/>(API records Pending)"] --> blob[("Blob Storage<br/>private")]
+    blob -- "BlobCreated" --> eg["Event Grid<br/>managed identity"]
+    eg --> sb["Service Bus Basic queue"]
+    eg -. "undeliverable" .-> egdl[("Dead-letter<br/>storage account")]
+    sb -- "KEDA, from zero" --> worker["Container Apps Job<br/>same validation engine"]
+    sb -. "after 5 deliveries" .-> dlq["Dead-letter queue"]
+    worker --> jobs[("Table Storage<br/>status + results")]
     ui["Streamlit / API"] --> jobs
 ```
 
-Failures retry and then dead-letter instead of being lost, and the UI shows job status. The
-validation engine does not change — the worker calls the same pure `InvoiceService.process()`
-the API uses today. Azure AI Search and Document Intelligence (OCR) are later candidates.
+- **At-least-once delivery, exactly-once results.** The worker claims each submission with a
+  lease (ETag compare-and-set), never completes a message while another worker holds the lease,
+  and stores the result **before** completing the message. Duplicates are recognised; transient
+  failures retry and then dead-letter with a visible status.
+- **Measured on Azure** (6 test submissions): upload to result **24.5–35.7 s**; message queued
+  ≈ 0.8 s after upload; validation < 0.1 s. Almost all of the time is the worker starting from
+  zero — the trade-off for paying nothing while idle.
+- **Concurrency:** three simultaneous submissions started three overlapping executions (the
+  configured maximum); the first one drained all three messages, the other two found nothing.
+  Correct, slightly wasteful under bursts.
+- **Cost:** no fixed monthly charges (Service Bus Basic, storage, Event Grid at this scale);
+  estimated DKK 0.1–0.2/month while idle.
+
+Full write-up, including the Event Grid dead-letter authorization finding:
+[docs/evidence/production-verification.md](docs/evidence/production-verification.md) and
+[docs/design/async-invoice-processing.md](docs/design/async-invoice-processing.md).
 
 ## Repository layout
 
@@ -316,11 +368,14 @@ the API uses today. Azure AI Search and Document Intelligence (OCR) are later ca
 src/invoiceiq/
   core/        validation engine, invoice service, BM25 retriever, usage limiter (no web/AI imports)
   ai/          evidence, prompts, providers (mock + Azure OpenAI), chat orchestration
+  processing/  submissions, Event Grid parsing, Service Bus access, idempotent worker logic
+  worker.py    entry point of the Container Apps Job (no AI imports)
   api/         FastAPI app, routes, schemas, middleware
   frontend/    Streamlit app, views/, API client, presentation helpers
   storage/     Azure Table Storage usage store
   runtime/     container supervisor and health check
 data/          fictional invoices and purchasing policy
 infra/terraform/   Azure infrastructure + plan tests
-docs/          design notes, deployment readiness review, screenshots
+infra/manual-tests/  isolated Event Grid → Service Bus compatibility test
+docs/          design notes, production evidence, deployment readiness review, screenshots
 ```

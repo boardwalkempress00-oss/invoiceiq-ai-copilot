@@ -118,8 +118,14 @@ def _render_result(sub: dict) -> None:
     head = st.columns([2, 1, 1, 1])
     with head[0]:
         components.status_badge(result["status"])
-        st.markdown(f"#### {invoice.get('invoice_number') or sub.get('invoice_id')}")
-        st.caption(invoice.get("vendor") or "")
+        # Invoice number and vendor come from the submitted file: render them as escaped text.
+        st.html(
+            components.untrusted_html(
+                invoice.get("invoice_number") or sub.get("invoice_id"), "iq-h4"
+            )
+        )
+        if invoice.get("vendor"):
+            st.html(components.untrusted_html(invoice["vendor"]))
     with head[1]:
         components.amount_block("Stated total", invoice.get("total"), invoice.get("currency"))
     with head[2]:
@@ -149,17 +155,9 @@ def _render_result(sub: dict) -> None:
             for finding in group.findings:
                 fs = severity_style(finding["severity"])
                 with st.container(border=True):
-                    top = st.columns([3, 1])
-                    top[0].markdown(f"**{finding['title']}** · `{finding['finding_id']}`")
-                    with top[1]:
-                        st.badge(fs.label, icon=fs.icon, color=fs.color)  # type: ignore[arg-type]
-                    st.markdown(finding["description"])
-                    cols = st.columns(3)
-                    cols[0].markdown(f"**Expected**  \n{finding.get('expected_value') or '—'}")
-                    cols[1].markdown(f"**Actual**  \n{finding.get('actual_value') or '—'}")
-                    cols[2].markdown(f"**Policy**  \n`{finding['policy_reference']}`")
-                    st.markdown(f":material/task_alt: **Recommended action:** "
-                                f"{finding['recommended_action']}")  # fmt: skip
+                    st.badge(fs.label, icon=fs.icon, color=fs.color)  # type: ignore[arg-type]
+                    # Findings can quote submitted values (line IDs, currency): escaped HTML only.
+                    st.html(components.finding_html(finding))
 
 
 def _render(sub: dict) -> None:
@@ -174,9 +172,10 @@ def _render(sub: dict) -> None:
     if status == "Completed" and sub.get("result"):
         _render_result(sub)
     elif status in ("Failed", "DeadLettered") and error:
-        st.error(error["message"], icon=":material/error:")
-        for detail in error.get("details", []):
-            st.markdown(f"- `{detail}`")
+        st.error(components.md_literal(error["message"]), icon=":material/error:")
+        if error.get("details"):
+            # Schema details name fields from the submitted JSON: escaped HTML only.
+            st.html(components.details_html(error["details"]))
     elif status == "Stalled":
         st.warning(
             "This submission stopped making progress. It may have been moved to the dead-letter "
@@ -184,7 +183,7 @@ def _render(sub: dict) -> None:
             icon=":material/hourglass_disabled:",
         )
     elif error:  # a retry is pending
-        st.info(error["message"], icon=":material/autorenew:")
+        st.info(components.md_literal(error["message"]), icon=":material/autorenew:")
 
 
 active = st.session_state.get(ACTIVE)
