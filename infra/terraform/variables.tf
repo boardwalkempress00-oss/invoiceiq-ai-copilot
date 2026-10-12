@@ -51,6 +51,17 @@ variable "container_image" {
   }
 }
 
+variable "worker_container_image" {
+  description = "Image for the worker job (Container Apps Job). null = use container_image, as before this variable existed. Set it to roll out the web app and the worker independently."
+  type        = string
+  default     = null
+
+  validation {
+    condition     = var.worker_container_image == null || !endswith(coalesce(var.worker_container_image, "x"), ":latest")
+    error_message = "Pin an immutable tag or digest instead of :latest."
+  }
+}
+
 variable "min_replicas" {
   description = "0 = scale to zero when idle (no compute cost while idle)."
   type        = number
@@ -169,9 +180,9 @@ variable "session_request_limit" {
 }
 
 variable "ai_provider" {
-  description = "azure_openai for live answers; mock for a zero-cost public demo."
+  description = "mock (default) for a zero-cost public demo; azure_openai for live answers — opt in explicitly."
   type        = string
-  default     = "azure_openai"
+  default     = "mock"
 
   validation {
     condition     = contains(["azure_openai", "mock", "disabled"], var.ai_provider)

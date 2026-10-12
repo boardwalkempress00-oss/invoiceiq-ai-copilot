@@ -235,7 +235,9 @@ OIDC deploy identity.
    only for commits whose CI passed) and copy the digest from the run summary.
 3. `cp infra/terraform/terraform.tfvars.example infra/terraform/terraform.tfvars` and fill in the
    image, model, version and **real token prices** (Terraform refuses zero prices — the daily cost
-   budget depends on them).
+   budget depends on them). `ai_provider` defaults to `mock`; set `azure_openai` to opt in to live
+   answers. `worker_container_image` (optional, defaults to `container_image`) lets the web app and
+   the worker job be rolled out independently.
 4. ```bash
    cd infra/terraform
    terraform init

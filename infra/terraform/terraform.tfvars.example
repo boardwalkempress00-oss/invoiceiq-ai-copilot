@@ -6,6 +6,11 @@ location        = "swedencentral"
 
 # Digest from the "Publish image" workflow run summary.
 container_image = "ghcr.io/<github-owner>/invoiceiq-ai-copilot@sha256:<digest>"
+# Optional: a different image for the worker job (defaults to container_image).
+# worker_container_image = "ghcr.io/<github-owner>/invoiceiq-ai-copilot@sha256:<digest>"
+
+# mock (default) = offline answers, no model calls. azure_openai = live answers (opt in).
+# ai_provider = "mock"
 
 # VERIFY before applying — availability and versions change:
 #   az cognitiveservices model list -l swedencentral \
