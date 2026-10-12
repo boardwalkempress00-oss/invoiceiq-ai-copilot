@@ -337,6 +337,9 @@ in controlled and documented runs — see the [evidence](docs/evidence/productio
   Retries, lease takeover and dead-lettering are covered by automated tests, not yet exercised in
   Azure. Processing from upload to result takes 24.5–35.7 s, almost all of it the worker
   starting from zero.
+- The processing demo's daily allowances live in memory: best-effort, reset whenever the app
+  scales to zero, and per replica. They protect memory and CPU, not a budget — the demo makes no
+  paid calls.
 - Per-session limits are per browser session; reloading starts a new session. The **global**
   request and cost caps are the hard limits.
 - Streamlit holds a WebSocket per open tab, so an idle tab would keep the replica running. An
@@ -389,7 +392,7 @@ Full write-up, including the Event Grid dead-letter authorization finding:
 | Setting | Effect |
 |---|---|
 | neither flag (default) | No processing endpoints; `/submissions` and `/demo` answer 404 `feature_disabled` |
-| `DEMO_MODE_ENABLED=true` | **Simulated** demo: `/demo/scenarios`, `/demo/runs`, `/demo/reference` and the *Try processing* page. Catalog scenarios only, in memory, bounded (200 runs, 1 h expiry, daily allowances). Never constructs an Azure client. |
+| `DEMO_MODE_ENABLED=true` | **Simulated** demo: `/demo/scenarios`, `/demo/runs`, `/demo/reference` and the *Try processing* page. Catalog scenarios only, in memory, bounded (200 runs, 1 h expiry). Never constructs an Azure client. Its daily allowances are **process-local and best-effort**: they reset when the replica restarts or scales to zero and are not shared between replicas. |
 | `ASYNC_PROCESSING_ENABLED=true` | Live processing: `/submissions` and the *Process Invoice* page. With `SUBMISSION_BACKEND=azure` this uses Blob Storage, Service Bus and Table Storage — reserved for protected, non-public use. |
 
 The two flags are independent; the public configuration is demo on, live processing off.

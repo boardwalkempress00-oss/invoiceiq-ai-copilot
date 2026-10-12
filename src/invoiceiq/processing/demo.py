@@ -10,7 +10,9 @@ demo cannot read or write Blob Storage, Service Bus or Table Storage, whatever e
 Visitors choose from a fixed catalog of scenarios; there is no upload path.
 
 Memory is bounded: at most `max_runs` demo runs are kept, each for at most `ttl` seconds, and
-blobs are dropped as soon as a run finishes.
+blobs are dropped as soon as a run finishes. The daily allowances are process-local and
+best-effort: they reset when the replica restarts or scales to zero and are not shared between
+replicas. That is acceptable because a run costs a few milliseconds of CPU and calls nothing paid.
 """
 
 from __future__ import annotations
