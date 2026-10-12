@@ -1,0 +1,41 @@
+{
+  "invoice_id": "demo-clean",
+  "invoice_number": "DEMO-2026-1001",
+  "vendor": {
+    "name": "Lindholm Office Supplies ApS",
+    "vat_number": "DEMO-VAT-1001",
+    "country": "DK",
+    "email": "invoices@lindholm.example"
+  },
+  "buyer": {
+    "name": "Aurora Nordic Trading ApS",
+    "country": "DK",
+    "cost_center": "CC-310 Demo"
+  },
+  "issue_date": "2026-09-15",
+  "due_date": "2026-10-15",
+  "currency": "DKK",
+  "purchase_order": "PO-71001",
+  "line_items": [
+    {
+      "line_id": "1",
+      "description": "Printer paper, box",
+      "quantity": "12",
+      "unit_price": "189.00",
+      "line_total": "2268.00"
+    },
+    {
+      "line_id": "2",
+      "description": "Desk organiser",
+      "quantity": "4",
+      "unit_price": "129.50",
+      "line_total": "518.00"
+    }
+  ],
+  "subtotal": "2786.00",
+  "vat_rate": "0.25",
+  "vat_amount": "696.50",
+  "total": "3482.50",
+  "approval": null,
+  "notes": "Fictional demo scenario. "
+}

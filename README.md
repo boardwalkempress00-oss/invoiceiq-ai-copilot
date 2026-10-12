@@ -15,6 +15,28 @@ offline mock AI provider; live Azure OpenAI and the event-driven invoice pipelin
 deployed and **verified in controlled tests**, and switched off for public visitors. Evidence:
 [docs/evidence/production-verification.md](docs/evidence/production-verification.md).
 
+### Try it
+
+**Public app:** <https://ca-invoiceiq-dbmr0.bravewater-5e6a1283.swedencentral.azurecontainerapps.io>
+
+What to expect in the public app today:
+
+- **The first visit can take about 30 seconds.** The app scales to zero when idle (measured
+  cold start: 28 s on average), so it costs nothing while nobody is using it.
+- **AI answers come from the offline mock model.** Validation, policy citations and evidence are
+  real; the wording is generated without a live model, so it costs nothing.
+- **No uploads.** You can explore the three fictional sample invoices; uploading your own files is
+  disabled for public visitors.
+- **The event-driven pipeline is switched off for visitors.** Its measured behaviour in Azure
+  (24.5–35.7 s from upload to result, worker starting from zero) is documented in the evidence
+  file above.
+- **Start here page and processing demo (in development, not yet deployed).** The next release
+  adds a Start here page and a *simulated* processing demo: ten fictional scenarios run through
+  the real processing and validation code inside the web app, with in-memory stand-ins for
+  Blob Storage, Event Grid, Service Bus and Table Storage. Demo results are labelled
+  *simulated* and shown next to — never mixed with — the verified Azure reference run. The demo
+  uses no Azure storage or messaging, and visitors cannot upload anything.
+
 ---
 
 ## Contents
@@ -147,7 +169,7 @@ automated tests; **planned** = not built. Details and measurements:
 | Terraform (incl. event-processing resources) | ✅ Applied; plan reports no drift |
 | CI, image publishing (GHCR, amd64 + arm64) | ✅ In use |
 | Deploy workflow (OIDC) | ✅ Written — **disabled** until credentials are reviewed |
-| Public demo of invoice processing (simulated scenario gallery) | ⏳ Planned |
+| Public demo of invoice processing (simulated scenario gallery, `DEMO_MODE_ENABLED`) | 🧪 Built and tested locally; not yet deployed |
 | Azure AI Search, Document Intelligence, authentication | ⏳ Planned |
 
 ## Run locally
@@ -362,19 +384,30 @@ Full write-up, including the Event Grid dead-letter authorization finding:
 [docs/evidence/production-verification.md](docs/evidence/production-verification.md) and
 [docs/design/async-invoice-processing.md](docs/design/async-invoice-processing.md).
 
+### Processing modes and feature flags
+
+| Setting | Effect |
+|---|---|
+| neither flag (default) | No processing endpoints; `/submissions` and `/demo` answer 404 `feature_disabled` |
+| `DEMO_MODE_ENABLED=true` | **Simulated** demo: `/demo/scenarios`, `/demo/runs`, `/demo/reference` and the *Try processing* page. Catalog scenarios only, in memory, bounded (200 runs, 1 h expiry, daily allowances). Never constructs an Azure client. |
+| `ASYNC_PROCESSING_ENABLED=true` | Live processing: `/submissions` and the *Process Invoice* page. With `SUBMISSION_BACKEND=azure` this uses Blob Storage, Service Bus and Table Storage — reserved for protected, non-public use. |
+
+The two flags are independent; the public configuration is demo on, live processing off.
+
 ## Repository layout
 
 ```
 src/invoiceiq/
   core/        validation engine, invoice service, BM25 retriever, usage limiter (no web/AI imports)
   ai/          evidence, prompts, providers (mock + Azure OpenAI), chat orchestration
-  processing/  submissions, Event Grid parsing, Service Bus access, idempotent worker logic
+  processing/  submissions, Event Grid parsing, Service Bus access, idempotent worker logic,
+               simulated public demo (demo.py)
   worker.py    entry point of the Container Apps Job (no AI imports)
   api/         FastAPI app, routes, schemas, middleware
   frontend/    Streamlit app, views/, API client, presentation helpers
   storage/     Azure Table Storage usage store
   runtime/     container supervisor and health check
-data/          fictional invoices and purchasing policy
+data/          fictional invoices, purchasing policy, demo scenarios, verified reference run
 infra/terraform/   Azure infrastructure + plan tests
 infra/manual-tests/  isolated Event Grid → Service Bus compatibility test
 docs/          design notes, production evidence, deployment readiness review, screenshots

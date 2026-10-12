@@ -1,0 +1,38 @@
+{
+  "invoice_id": "demo-insufficient-authority",
+  "invoice_number": "DEMO-2026-1004",
+  "vendor": {
+    "name": "Skovlund Engineering A/S",
+    "vat_number": "DEMO-VAT-1004",
+    "country": "DK",
+    "email": "invoices@skovlund.example"
+  },
+  "buyer": {
+    "name": "Aurora Nordic Trading ApS",
+    "country": "DK",
+    "cost_center": "CC-310 Demo"
+  },
+  "issue_date": "2026-09-15",
+  "due_date": "2026-10-15",
+  "currency": "DKK",
+  "purchase_order": "PO-71004",
+  "line_items": [
+    {
+      "line_id": "1",
+      "description": "Warehouse racking installation",
+      "quantity": "1",
+      "unit_price": "128000.00",
+      "line_total": "128000.00"
+    }
+  ],
+  "subtotal": "128000.00",
+  "vat_rate": "0.25",
+  "vat_amount": "32000.00",
+  "total": "160000.00",
+  "approval": {
+    "approved_by": "Jonas Holm (fictional)",
+    "approver_role": "manager",
+    "approved_on": "2026-09-17"
+  },
+  "notes": "Fictional demo scenario. "
+}

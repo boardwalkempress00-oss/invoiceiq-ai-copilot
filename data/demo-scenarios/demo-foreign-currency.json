@@ -1,0 +1,34 @@
+{
+  "invoice_id": "demo-foreign-currency",
+  "invoice_number": "DEMO-2026-1009",
+  "vendor": {
+    "name": "Nordwind Logistics GmbH",
+    "vat_number": "DEMO-VAT-1009",
+    "country": "DE",
+    "email": "invoices@nordwind.example"
+  },
+  "buyer": {
+    "name": "Aurora Nordic Trading ApS",
+    "country": "DK",
+    "cost_center": "CC-310 Demo"
+  },
+  "issue_date": "2026-09-15",
+  "due_date": "2026-10-15",
+  "currency": "EUR",
+  "purchase_order": "PO-71009",
+  "line_items": [
+    {
+      "line_id": "1",
+      "description": "Freight, Hamburg–Aarhus",
+      "quantity": "3",
+      "unit_price": "1850.00",
+      "line_total": "5550.00"
+    }
+  ],
+  "subtotal": "5550.00",
+  "vat_rate": "0.00",
+  "vat_amount": "0.00",
+  "total": "5550.00",
+  "approval": null,
+  "notes": "Fictional demo scenario. "
+}

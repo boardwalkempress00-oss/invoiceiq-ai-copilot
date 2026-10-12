@@ -1,0 +1,108 @@
+{
+  "version": 1,
+  "scenarios": [
+    {
+      "scenario_id": "demo-clean",
+      "title": "Clean invoice",
+      "story": "Everything adds up and no approval is needed.",
+      "file": "demo-clean.json",
+      "expected_status": "Passed",
+      "expected_rules": []
+    },
+    {
+      "scenario_id": "demo-approved-manager",
+      "title": "Approved by the right person",
+      "story": "Above DKK 20,000 and approved by a manager — exactly what policy requires.",
+      "file": "demo-approved-manager.json",
+      "expected_status": "Passed",
+      "expected_rules": []
+    },
+    {
+      "scenario_id": "demo-approval-missing",
+      "title": "Missing approval",
+      "story": "Above DKK 20,000 but nobody approved it.",
+      "file": "demo-approval-missing.json",
+      "expected_status": "Flagged",
+      "expected_rules": [
+        "APR-001"
+      ]
+    },
+    {
+      "scenario_id": "demo-insufficient-authority",
+      "title": "Approved at too low a level",
+      "story": "Above DKK 100,000 needs a director; only a manager approved.",
+      "file": "demo-insufficient-authority.json",
+      "expected_status": "Flagged",
+      "expected_rules": [
+        "APR-002"
+      ]
+    },
+    {
+      "scenario_id": "demo-vat-error",
+      "title": "Wrong VAT amount",
+      "story": "The VAT line does not match 25% of the subtotal, so the total is wrong too.",
+      "file": "demo-vat-error.json",
+      "expected_status": "Requires Review",
+      "expected_rules": [
+        "CALC-003",
+        "CALC-004"
+      ]
+    },
+    {
+      "scenario_id": "demo-line-error",
+      "title": "Line total does not add up",
+      "story": "One line's quantity × unit price is wrong; the error cascades to subtotal, VAT and total.",
+      "file": "demo-line-error.json",
+      "expected_status": "Requires Review",
+      "expected_rules": [
+        "CALC-001",
+        "CALC-002",
+        "CALC-003",
+        "CALC-004"
+      ]
+    },
+    {
+      "scenario_id": "demo-nonstandard-vat",
+      "title": "Non-standard VAT rate",
+      "story": "A domestic supplier charged 12% instead of the standard 25%.",
+      "file": "demo-nonstandard-vat.json",
+      "expected_status": "Requires Review",
+      "expected_rules": [
+        "VAT-001"
+      ]
+    },
+    {
+      "scenario_id": "demo-foreign-supplier",
+      "title": "Foreign supplier",
+      "story": "A German supplier with 0% VAT needs a manual VAT (reverse-charge) review.",
+      "file": "demo-foreign-supplier.json",
+      "expected_status": "Requires Review",
+      "expected_rules": [
+        "VAT-002"
+      ]
+    },
+    {
+      "scenario_id": "demo-foreign-currency",
+      "title": "Invoice in euros",
+      "story": "Not in DKK, so approval thresholds cannot be evaluated automatically.",
+      "file": "demo-foreign-currency.json",
+      "expected_status": "Requires Review",
+      "expected_rules": [
+        "CUR-001",
+        "VAT-002"
+      ]
+    },
+    {
+      "scenario_id": "demo-missing-fields",
+      "title": "Missing information",
+      "story": "No issue date or subtotal, and a line without price or total — so the approval threshold cannot be checked.",
+      "file": "demo-missing-fields.json",
+      "expected_status": "Flagged",
+      "expected_rules": [
+        "APR-003",
+        "REQ-001",
+        "REQ-002"
+      ]
+    }
+  ]
+}

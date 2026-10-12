@@ -21,15 +21,19 @@ st.set_page_config(
 components.inject_css()
 
 P = components.PAGE_PATHS
+features = state.health() or {}
 workspace = [
-    st.Page(P["dashboard"], title="Dashboard", icon=":material/dashboard:", default=True),
+    st.Page(P["dashboard"], title="Dashboard", icon=":material/dashboard:"),
     st.Page(P["analysis"], title="Invoice Analysis", icon=":material/fact_check:"),
     st.Page(P["chat"], title="AI Chat", icon=":material/forum:"),
 ]
-if (state.health() or {}).get("async_processing"):  # shown only when the backend enables it
+if features.get("demo_mode"):  # simulated, in memory — safe for public visitors
+    workspace.append(st.Page(P["demo"], title="Try processing", icon=":material/play_circle:"))
+if features.get("async_processing"):  # live Azure pipeline — only enabled for protected tests
     workspace.append(st.Page(P["process"], title="Process Invoice", icon=":material/upload_file:"))
 navigation = st.navigation(
     {
+        "": [st.Page(P["home"], title="Start here", icon=":material/home:", default=True)],
         "Workspace": workspace,
         "About this project": [
             st.Page(P["architecture"], title="Architecture", icon=":material/account_tree:"),

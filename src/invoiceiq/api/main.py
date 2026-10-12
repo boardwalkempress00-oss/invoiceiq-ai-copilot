@@ -15,6 +15,7 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 from invoiceiq import __version__
 from invoiceiq.ai.ai_service import ChatService
 from invoiceiq.ai.providers import ChatProvider, create_provider
+from invoiceiq.api.demo_routes import router as demo_router
 from invoiceiq.api.middleware import correlation_and_timing, error_response
 from invoiceiq.api.routes import AppContainer, InputTooLongError, router
 from invoiceiq.api.submission_routes import router as submission_router
@@ -34,6 +35,7 @@ from invoiceiq.core.usage_limiter import (
     UsageStore,
 )
 from invoiceiq.logging_config import configure_logging
+from invoiceiq.processing.demo import DemoError, DemoService
 from invoiceiq.processing.submissions import SubmissionError, SubmissionService
 
 logger = logging.getLogger(__name__)
@@ -103,12 +105,20 @@ def create_submission_service(
     )
 
 
+def create_demo_service(settings: Settings) -> DemoService | None:
+    """None when the demo is off. Built from in-memory parts only — never from Azure clients."""
+    if not settings.demo_mode_enabled:
+        return None
+    return DemoService.from_settings(settings)
+
+
 def build_container(
     settings: Settings,
     *,
     provider: ChatProvider | None = None,
     usage_store: UsageStore | None = None,
     submission_service: SubmissionService | None = None,
+    demo_service: DemoService | None = None,
 ) -> AppContainer:
     invoice_service = InvoiceService(JsonInvoiceRepository(settings.invoices_dir))
     retriever = BM25PolicyRetriever.from_file(
@@ -132,6 +142,7 @@ def build_container(
         invoice_service,
         chat_service,
         submission_service or create_submission_service(settings, invoice_service),
+        demo_service or create_demo_service(settings),
     )
 
 
@@ -157,6 +168,11 @@ def create_app(
     app.middleware("http")(correlation_and_timing)
     app.include_router(router)
     app.include_router(submission_router)
+    app.include_router(demo_router)
+
+    @app.exception_handler(DemoError)
+    async def _demo_error(_: Request, exc: DemoError) -> JSONResponse:
+        return error_response(exc.status_code, exc.code, exc.message)
 
     @app.exception_handler(SubmissionError)
     async def _submission_error(_: Request, exc: SubmissionError) -> JSONResponse:

@@ -56,6 +56,7 @@ class ErrorCode(StrEnum):
 class SubmissionSource(StrEnum):
     SAMPLE = "sample"
     UPLOAD = "upload"
+    DEMO = "demo"  # public demo: predefined scenario, processed in memory only
 
 
 @dataclass(frozen=True)

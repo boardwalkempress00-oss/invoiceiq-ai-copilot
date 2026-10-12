@@ -1,0 +1,34 @@
+{
+  "invoice_id": "demo-nonstandard-vat",
+  "invoice_number": "DEMO-2026-1007",
+  "vendor": {
+    "name": "Østerby Software ApS",
+    "vat_number": "DEMO-VAT-1007",
+    "country": "DK",
+    "email": "invoices@østerby.example"
+  },
+  "buyer": {
+    "name": "Aurora Nordic Trading ApS",
+    "country": "DK",
+    "cost_center": "CC-310 Demo"
+  },
+  "issue_date": "2026-09-15",
+  "due_date": "2026-10-15",
+  "currency": "DKK",
+  "purchase_order": "PO-71007",
+  "line_items": [
+    {
+      "line_id": "1",
+      "description": "Annual licence renewal",
+      "quantity": "1",
+      "unit_price": "8400.00",
+      "line_total": "8400.00"
+    }
+  ],
+  "subtotal": "8400.00",
+  "vat_rate": "0.12",
+  "vat_amount": "1008.00",
+  "total": "9408.00",
+  "approval": null,
+  "notes": "Fictional demo scenario. "
+}

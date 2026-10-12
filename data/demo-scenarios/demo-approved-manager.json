@@ -1,0 +1,38 @@
+{
+  "invoice_id": "demo-approved-manager",
+  "invoice_number": "DEMO-2026-1002",
+  "vendor": {
+    "name": "Fjeldsted IT Consulting A/S",
+    "vat_number": "DEMO-VAT-1002",
+    "country": "DK",
+    "email": "invoices@fjeldsted.example"
+  },
+  "buyer": {
+    "name": "Aurora Nordic Trading ApS",
+    "country": "DK",
+    "cost_center": "CC-310 Demo"
+  },
+  "issue_date": "2026-09-15",
+  "due_date": "2026-10-15",
+  "currency": "DKK",
+  "purchase_order": "PO-71002",
+  "line_items": [
+    {
+      "line_id": "1",
+      "description": "Network assessment (hours)",
+      "quantity": "24",
+      "unit_price": "1150.00",
+      "line_total": "27600.00"
+    }
+  ],
+  "subtotal": "27600.00",
+  "vat_rate": "0.25",
+  "vat_amount": "6900.00",
+  "total": "34500.00",
+  "approval": {
+    "approved_by": "Mette Sørensen (fictional)",
+    "approver_role": "manager",
+    "approved_on": "2026-09-16"
+  },
+  "notes": "Fictional demo scenario. "
+}

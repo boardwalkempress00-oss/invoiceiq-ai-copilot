@@ -69,6 +69,9 @@ class HealthResponse(_Schema):
     async_processing: bool = Field(
         default=False, description="True when invoice upload and asynchronous processing is on."
     )
+    demo_mode: bool = Field(
+        default=False, description="True when the simulated processing demo is available."
+    )
 
 
 class PolicySectionOut(_Schema):
@@ -183,3 +186,39 @@ class SubmissionOut(_Schema):
     poll_after_ms: int | None = Field(
         description="Suggested delay before checking again; null once the status is final."
     )
+
+
+# --- Public demo (simulated, in memory) -------------------------------------------------------
+
+
+class DemoScenarioOut(_Schema):
+    scenario_id: str
+    title: str
+    story: str
+    invoice_number: str | None
+    vendor: str | None
+    rules_exercised: list[str]
+
+
+class DemoRunRequest(_Schema):
+    session_id: str = Field(pattern=SESSION_ID_PATTERN)
+    scenario_id: str = Field(pattern=r"^demo-[a-z0-9-]{1,40}$")
+
+
+class DemoStepOut(_Schema):
+    step: str
+    at: datetime | None
+    offset_ms: float | None
+
+
+class DemoRunOut(_Schema):
+    run_id: str
+    scenario_id: str
+    scenario_title: str
+    processing_mode: Literal["simulated"]
+    provenance: str
+    status: str
+    steps: list[DemoStepOut]
+    invoice: dict[str, Any] | None = None
+    result: ValidationResult | None = None
+    error: SubmissionErrorOut | None = None

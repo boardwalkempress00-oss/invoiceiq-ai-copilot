@@ -210,3 +210,16 @@ class ApiClient:
         return self._request(  # type: ignore[no-any-return]
             "GET", "/submissions", params={"session_id": session_id, "limit": limit}
         )
+
+    # -- public demo (simulated, in memory) ------------------------------------------------------
+
+    def demo_scenarios(self) -> list[dict[str, Any]]:
+        return self._cached("demo:scenarios", "GET", "/demo/scenarios")  # type: ignore[no-any-return]
+
+    def demo_reference(self) -> dict[str, Any]:
+        return self._cached("demo:reference", "GET", "/demo/reference")  # type: ignore[no-any-return]
+
+    def run_demo(self, *, session_id: str, scenario_id: str) -> dict[str, Any]:
+        return self._request(  # type: ignore[no-any-return]
+            "POST", "/demo/runs", json={"session_id": session_id, "scenario_id": scenario_id}
+        )
