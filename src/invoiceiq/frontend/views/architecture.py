@@ -1,7 +1,8 @@
 """Architecture: what is deployed, how it was verified, and what is still planned.
 
 Every status says where the evidence comes from — verified in Azure, verified locally by
-automated tests, or planned. Measured numbers are copied from docs/evidence, never estimated.
+automated tests, deployed as a simulation, or planned. Measured numbers are copied from
+docs/evidence, never estimated.
 """
 
 from __future__ import annotations
@@ -15,13 +16,16 @@ st.markdown(
     "InvoiceIQ separates **deterministic finance logic** from **language generation**. Python "
     "decides whether an invoice is correct; the AI model only explains verified results. "
     "Invoices can also be processed **asynchronously** through an event-driven pipeline on "
-    "Azure — built, deployed and verified, but switched **off** for public visitors."
+    "Azure — deployed and verified in controlled tests, but switched **off** for public "
+    "submissions. The public *Try processing* demo is deployed separately: it runs the same "
+    "processing code **simulated in memory** and uses no Azure storage or messaging."
 )
 
-legend = st.columns(3)
+legend = st.columns(4)
 legend[0].badge("Verified in Azure", icon=":material/verified:", color="green")
 legend[1].badge("Verified locally (automated tests)", icon=":material/science:", color="blue")
-legend[2].badge("Planned (not built yet)", icon=":material/schedule:", color="gray")
+legend[2].badge("Deployed · simulated in memory", icon=":material/play_circle:", color="violet")
+legend[3].badge("Planned (not built yet)", icon=":material/schedule:", color="gray")
 
 DIAGRAM = """
 digraph G {
@@ -86,8 +90,7 @@ st.dataframe(
         {"Component": "Mock AI provider", "Status": "✓ Verified in Azure",
          "Evidence": "Production default; AI spend shown as exactly 0."},
         {"Component": "Azure OpenAI provider", "Status": "✓ Verified in Azure (controlled)",
-         "Evidence": "5 live requests in an IP-restricted test window; production stays in mock "
-                     "mode."},
+         "Evidence": "5 live requests in an IP-restricted test; production uses mock mode."},
         {"Component": "Usage limiter on Table Storage", "Status": "✓ Verified in Azure",
          "Evidence": "Daily counters decrement per question; session cap enforced."},
         {"Component": "Blob upload · Event Grid · Service Bus Basic",
@@ -99,14 +102,15 @@ st.dataframe(
          "Status": "✓ Verified locally (automated tests)",
          "Evidence": "Deterministic tests with Service Bus semantics; not exercised in Azure."},
         {"Component": "Public demo of invoice processing",
-         "Status": "✓ Verified locally (automated tests)",
-         "Evidence": "Simulated scenario gallery with in-memory stand-ins, labelled as simulated; "
-                     "uses no Azure storage or messaging. Not yet deployed."},
+         "Status": "◐ Deployed · simulated in memory",
+         "Evidence": "Real code with in-memory stand-ins; no Azure storage or messaging."},
         {"Component": "Azure AI Search", "Status": "○ Planned",
          "Evidence": "Could replace BM25 behind the existing PolicyRetriever interface."},
     ],
     hide_index=True,
     width="stretch",
+    height=(1 + 12) * 35 + 3,  # every row visible, no inner scrolling
+    column_config={"Status": st.column_config.TextColumn(width=260)},
 )  # fmt: skip
 
 st.subheader("Measured in Azure")
@@ -186,8 +190,9 @@ st.markdown(
     "- **Fail closed on cost.** If usage cannot be recorded, no AI call is made.\n"
     "- **Pay nothing while idle.** Web app and worker scale to zero; the cost is a cold start "
     "of roughly half a minute.\n"
-    "- **At-least-once delivery, exactly-once results.** Idempotent processing instead of "
-    "paid duplicate detection (Service Bus Basic has no fixed monthly charge).\n"
+    "- **At-least-once delivery, idempotent processing.** A redelivered message finds the "
+    "stored result instead of producing a second one — no paid duplicate detection needed "
+    "(Service Bus Basic has no fixed monthly charge).\n"
     "- **Replaceable edges.** Repository, retriever, AI provider, stores and queue are "
     "interfaces."
 )

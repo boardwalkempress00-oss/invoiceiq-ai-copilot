@@ -13,7 +13,7 @@ components.hero(
     "An AI copilot for accounts payable. Python validates every invoice with exact decimal "
     "arithmetic against a purchasing policy; the AI assistant explains the verified results "
     "and cites its evidence.",
-    tag="Milestone 1 · fictional demo data",
+    tag="Portfolio project · fictional demo data",
 )
 
 client = state.client()

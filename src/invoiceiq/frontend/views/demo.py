@@ -61,18 +61,14 @@ for i, scenario in enumerate(scenarios):
 def _render_run(run: dict) -> None:
     st.badge("Simulated in this container", icon=":material/science:", color="blue")
     st.caption(components.md_literal(run["provenance"]))
-    st.dataframe(
-        [
-            {
-                "Step": s["step"],
-                "Since submission": f"+{s['offset_ms']:.1f} ms"
-                if s["offset_ms"] is not None
-                else "—",
-            }
-            for s in run["steps"]
-        ],
-        hide_index=True,
-        width="stretch",
+    st.html(
+        components.timeline_html(
+            "Since submission",
+            [
+                (f"+{s['offset_ms']:.1f} ms" if s["offset_ms"] is not None else "—", s["step"])
+                for s in run["steps"]
+            ],
+        )
     )
     result, invoice = run.get("result"), run.get("invoice") or {}
     if not result:
@@ -128,13 +124,10 @@ def _render_reference() -> None:
             f"{ref['run']} on {ref['date']} · {ref['invoice']} · result: {ref['result']}"
         )
     )
-    st.dataframe(
-        [
-            {"Step": s["step"], "Since upload": f"+{s['offset_seconds']:.1f} s"}
-            for s in ref["steps"]
-        ],
-        hide_index=True,
-        width="stretch",
+    st.html(
+        components.timeline_html(
+            "Since upload", [(f"+{s['offset_seconds']:.1f} s", s["step"]) for s in ref["steps"]]
+        )
     )
     summary = ref["summary"]
     st.caption(

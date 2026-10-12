@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import re
+from html import unescape
 
 import pytest
 
@@ -17,6 +18,20 @@ def html(at) -> str:
 def text(at) -> str:
     """Visible text with Markdown backslash-escapes (from components.md_literal) removed."""
     return re.sub(r"\\(.)", r"\1", all_text(at)) + "\n" + html(at)
+
+
+def timelines(at) -> list[list[tuple[str, str]]]:
+    """(time, event) rows of each timeline table on the page, in order."""
+    tables = [
+        b
+        for b in (e.proto.body for e in at.get("html"))
+        if b.startswith('<table class="iq-timeline"')
+    ]
+    rows = []
+    for table in tables:
+        cells = re.findall(r'<td class="iq-t">(.*?)</td><td>(.*?)</td>', table)
+        rows.append([(unescape(t), unescape(event)) for t, event in cells])
+    return rows
 
 
 def demo_client():
@@ -108,11 +123,37 @@ def test_running_a_scenario_shows_simulated_result_beside_the_verified_reference
     assert "24.5–35.7 s" in body
     assert any(e.label.startswith("Invoice arithmetic — 2 finding(s)") for e in at.expander)
     # The demo's own timings are in milliseconds; the Azure reference stays in seconds.
-    demo_steps, reference_steps = at.dataframe[0].value, at.dataframe[1].value
-    assert all(v.endswith(" ms") or v == "—" for v in demo_steps["Since submission"])
-    assert list(reference_steps["Since upload"]) == [
-        "+0.0 s", "+0.8 s", "+4.5 s", "+26.6 s", "+29.3 s",
-    ]  # fmt: skip
+    demo_rows, reference_rows = timelines(at)
+    assert [event for _, event in demo_rows][-1] == "Completed"
+    assert all(t.endswith(" ms") for t, _ in demo_rows)
+    assert reference_rows == [
+        ("+0.0 s", "Submission accepted; file stored in Blob Storage"),
+        ("+0.8 s", "BlobCreated delivered to the Service Bus queue"),
+        ("+4.5 s", "KEDA detects the message and starts a worker job from zero"),
+        ("+26.6 s", "Worker container started (image pulled, container created)"),
+        ("+29.3 s", "Invoice validated and result stored"),
+    ]
+    assert "Source: docs/evidence/production-verification.md" in body
+
+
+def test_timelines_put_the_time_first_and_never_scroll_sideways(run_page):
+    at = run_page("demo", client=demo_client())
+    next(b for b in at.button if b.key == "run_demo-vat-error").click().run()
+    assert not at.dataframe  # canvas grids clip long text in narrow columns
+    tables = [
+        b
+        for b in (e.proto.body for e in at.get("html"))
+        if b.startswith('<table class="iq-timeline"')
+    ]
+    assert len(tables) == 2
+    for table in tables:
+        header = re.findall(r"<th(?: [^>]*)?>(.*?)</th>", table)
+        assert header[0] in ("Since submission", "Since upload") and header[1] == "Event"
+    css = html(at)
+    assert (
+        ".iq-timeline" in css and "table-layout: fixed" in css and "overflow-wrap: anywhere" in css
+    )
+    assert re.search(r"\.iq-timeline \.iq-t \{[^}]*white-space: nowrap", css)
 
 
 def test_clean_scenario_reports_all_checks_passed(run_page):

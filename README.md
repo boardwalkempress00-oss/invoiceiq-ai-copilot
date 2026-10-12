@@ -1,41 +1,64 @@
 # InvoiceIQ — AI Finance Operations Copilot
 
-**An AI assistant for accounts payable that never does the maths.** Python validates every
-invoice with exact decimal arithmetic against a purchasing policy; a language model then explains
-the verified results, cites its evidence, and drafts next steps for a person to review.
+**An AI assistant for accounts payable that never does the maths.** Python checks every invoice
+with exact decimal arithmetic against a purchasing policy; a language model only explains the
+verified results, cites the policy behind them and drafts next steps for a person to review.
+Invoices can also be processed by an event-driven pipeline on Azure that scales to zero.
 
 > **Portfolio project.** All invoices, companies, people and policies are **fictional**. The
 > rules (25% VAT, a DKK 20,000 approval threshold, …) are demo rules, not accounting, tax or
 > legal advice.
 
-![Dashboard](docs/screenshots/dashboard.png)
+**Live app:** <https://ca-invoiceiq-dbmr0.bravewater-5e6a1283.swedencentral.azurecontainerapps.io>
 
-**Status:** deployed on Azure Container Apps (Sweden Central). The public app runs with the
-offline mock AI provider; live Azure OpenAI and the event-driven invoice pipeline are built,
-deployed and **verified in controlled tests**, and switched off for public visitors. Evidence:
-[docs/evidence/production-verification.md](docs/evidence/production-verification.md).
+> **The first visit can take about 30 seconds.** The app scales to zero when nobody is using it,
+> so it costs nothing while idle; a fresh container starts on the first request (measured
+> average: 28 s). After that, pages respond immediately.
 
-### Try it
+![Start here page](docs/screenshots/start-here.png)
 
-**Public app:** <https://ca-invoiceiq-dbmr0.bravewater-5e6a1283.swedencentral.azurecontainerapps.io>
+## 60-second tour
 
-What to expect in the public app today:
+1. **Try processing** — click *Try InvoiceIQ*, pick one of ten fictional invoices (wrong VAT,
+   missing approval, foreign currency, …) and run it. The result shows the processing steps, the
+   findings and — in a separate panel — a historical run of the real Azure pipeline with its
+   measured timings. The demo is **simulated** inside the web app; see below.
+2. **Invoice Analysis** — open a flagged invoice: line items, stated versus recalculated totals,
+   and each finding with the policy section behind it.
+3. **AI Chat** — ask "Why was this invoice flagged?". The answer cites its evidence, and a
+   separate *verified facts* panel comes from the validation engine, never from the model. The
+   public app uses an offline mock model, so it costs nothing.
 
-- **The first visit can take about 30 seconds.** The app scales to zero when idle (measured
-  cold start: 28 s on average), so it costs nothing while nobody is using it.
-- **AI answers come from the offline mock model.** Validation, policy citations and evidence are
-  real; the wording is generated without a live model, so it costs nothing.
-- **No uploads.** You can explore the three fictional sample invoices; uploading your own files is
-  disabled for public visitors.
-- **The event-driven pipeline is switched off for visitors.** Its measured behaviour in Azure
-  (24.5–35.7 s from upload to result, worker starting from zero) is documented in the evidence
-  file above.
-- **Start here page and processing demo (in development, not yet deployed).** The next release
-  adds a Start here page and a *simulated* processing demo: ten fictional scenarios run through
-  the real processing and validation code inside the web app, with in-memory stand-ins for
-  Blob Storage, Event Grid, Service Bus and Table Storage. Demo results are labelled
-  *simulated* and shown next to — never mixed with — the verified Azure reference run. The demo
-  uses no Azure storage or messaging, and visitors cannot upload anything.
+## What this project demonstrates
+
+- **Deterministic logic, AI for language only.** Twelve validation rules in Python `Decimal`;
+  the model explains verified results and its citations are checked after generation.
+- **Event-driven processing on Azure, verified end to end.** Blob Storage → Event Grid →
+  Service Bus → a Container Apps Job started from zero by KEDA; idempotent result handling under
+  at-least-once delivery. Tested with six submissions in Azure.
+- **A safe public demo.** Visitors run predefined scenarios through the same processing code
+  with in-memory stand-ins — no uploads, no Azure storage or messaging, clearly labelled.
+- **Security by default.** Managed identities only, API and storage keys disabled, separate
+  least-privilege identities for the web app, worker and autoscaler, escaped rendering of
+  invoice text.
+- **Cost awareness.** Scale to zero, Service Bus Basic, a reserve-and-settle AI budget that fails
+  closed, and a mock AI provider for the public app.
+- **Engineering discipline.** 526 automated tests (95% coverage), 24 Terraform plan tests,
+  infrastructure as code, CI gates, and documented evidence instead of claims.
+
+**Read more:** [architecture case study](docs/case-study.md) ·
+[production verification evidence](docs/evidence/production-verification.md)
+
+## What is real and what is simulated
+
+| | In the public app | Evidence |
+|---|---|---|
+| Validation engine, policy citations, usage limiter | **Live** | Verified in Azure |
+| AI answers | **Mock** model (no live AI) | Azure OpenAI verified in a controlled test (5 requests) |
+| *Try processing* demo | **Deployed, simulated in memory** — uses no Blob Storage, Event Grid, Service Bus or Table Storage | Automated tests; production smoke test |
+| Event-driven pipeline (Blob → Event Grid → Service Bus → worker) | **Deployed but off** for public submissions | Verified in Azure — 6 test submissions |
+| Retries, lease takeover, dead-lettering | — | Automated tests only; not exercised in Azure |
+| Uploading your own invoices, Azure AI Search, authentication | — | Planned, not implemented |
 
 ---
 
@@ -43,11 +66,12 @@ What to expect in the public app today:
 
 [The problem](#the-business-problem) · [What it does](#what-it-does) ·
 [Architecture](#architecture) · [Tech stack](#technology-stack) ·
-[Implemented vs planned](#implemented-vs-planned) · [Run locally](#run-locally) ·
+[Status and evidence](#status-and-evidence) · [Run locally](#run-locally) ·
 [Docker](#docker) · [Deploy to Azure](#deploy-to-azure-terraform) ·
 [Security and cost controls](#security-and-cost-controls) · [Testing](#testing) ·
 [Design decisions](#key-design-decisions-and-trade-offs) · [Limitations](#known-limitations) ·
-[Event-driven processing](#event-driven-processing) · [Evidence](docs/evidence/production-verification.md)
+[Event-driven processing](#event-driven-processing) · [Case study](docs/case-study.md) ·
+[Evidence](docs/evidence/production-verification.md)
 
 ## The business problem
 
@@ -67,6 +91,7 @@ they are **unreliable at arithmetic** and can invent facts. InvoiceIQ splits the
 
 ## What it does
 
+- **Start here** — what the project is, what to try, and what is real versus simulated.
 - **Dashboard** — three fictional invoices with their status: *Passed*, *Flagged* or
   *Requires Review*.
 - **Invoice Analysis** — line items, stated vs. recalculated totals, findings grouped by root
@@ -74,20 +99,26 @@ they are **unreliable at arithmetic** and can invent facts. InvoiceIQ splits the
 - **AI Chat** — suggested questions, per-invoice chat history, cited evidence, and a separate
   "verified facts" panel produced by the validation engine, never by the model. Clear labels show
   whether an answer came from Azure OpenAI, the offline mock, or read-only mode.
-- **Process Invoice** — submit a fictional invoice and follow it through Blob Storage, Event Grid,
-  Service Bus and a background worker. Deployed and verified, but **off by default** in public
-  (see [Event-driven processing](#event-driven-processing)).
+- **Try processing** — ten predefined fictional scenarios that together exercise all twelve
+  rules, run through the real processing code **simulated in memory**, shown next to a
+  historical, verified Azure run.
+- **Process Invoice** — submit a fictional invoice to the real event-driven pipeline. Deployed
+  and verified, but **off** in the public app (see [Event-driven processing](#event-driven-processing)).
 - **Architecture** — what is deployed, how each part was verified, measured numbers and
   security boundaries.
 - **Observability** — real per-session latency, AI latency, token usage and estimated cost.
 
-| Invoice Analysis | AI Chat |
+| Try processing | Invoice Analysis |
 |---|---|
-| ![Invoice analysis](docs/screenshots/invoice-analysis.png) | ![AI chat](docs/screenshots/ai-chat.png) |
+| ![Demo result](docs/screenshots/demo-result.png) | ![Invoice analysis](docs/screenshots/invoice-analysis.png) |
 
-| Architecture | Observability |
+| AI Chat | Architecture |
 |---|---|
-| ![Architecture](docs/screenshots/architecture.png) | ![Observability](docs/screenshots/observability.png) |
+| ![AI chat](docs/screenshots/ai-chat.png) | ![Architecture](docs/screenshots/architecture.png) |
+
+| Dashboard | Observability |
+|---|---|
+| ![Dashboard](docs/screenshots/dashboard.png) | ![Observability](docs/screenshots/observability.png) |
 
 The three sample invoices:
 
@@ -108,21 +139,25 @@ flowchart LR
         api --> val["Validation engine<br/>Python Decimal"]
         api --> rag["BM25 policy retrieval"]
         api --> lim["Usage limiter<br/>reserve → settle"]
+        api --> demo["Try processing demo<br/>in-memory, simulated"]
     end
 
     api -- "managed identity" --> aoai["Azure OpenAI<br/>(mock in production)"]
     lim -- "managed identity · ETags" --> tbl[("Azure Table Storage<br/>daily quotas")]
     container -. "stdout JSON logs" .-> law["Log Analytics"]
 
-    subgraph ep["Event-driven processing · deployed, off by default"]
+    subgraph ep["Event-driven processing · deployed, off for public submissions"]
         blob[("Blob container<br/>invoice-uploads")] -- "BlobCreated" --> eg["Event Grid"]
         eg -- "managed identity" --> sb["Service Bus Basic<br/>queue + dead-letter"]
         sb -- "KEDA" --> job["Container Apps Job<br/>worker (0–3)"]
         job --> jobs[("Table invoicejobs<br/>status + results")]
     end
-    api -- "upload" --> blob
+    api -- "upload (off in public)" --> blob
     api -- "status" --> jobs
 ```
+
+The *Try processing* demo runs inside the web container and never touches the event-driven
+resources on the right.
 
 **A chat question, step by step:** the API loads the invoice and validates it → retrieves the
 policy sections cited by findings plus BM25 matches → **reserves** one request and an
@@ -148,13 +183,13 @@ read-only mode that still shows the verified validation results.
 | Container | Multi-stage Dockerfile, `tini` + Python supervisor, non-root |
 | Infrastructure | Terraform (AzureRM 4.81 + AzAPI 2.13): Container Apps and Jobs, Azure OpenAI, Storage, Event Grid, Service Bus, Log Analytics, managed identities |
 | CI/CD | GitHub Actions: ruff, pytest + Azurite, Terraform test, Docker smoke test; manual multi-arch image publishing; OIDC deploy (disabled) |
-| Quality | pytest (480 tests, 95% coverage), ruff, `terraform test` (15 runs, mocked providers) |
+| Quality | pytest (526 tests, 95% coverage), ruff, `terraform test` (24 runs, mocked providers) |
 
 ## Status and evidence
 
 **Verified in Azure** = observed in the production subscription; **verified locally** = covered by
-automated tests; **planned** = not built. Details and measurements:
-[docs/evidence/production-verification.md](docs/evidence/production-verification.md).
+automated tests; **simulated** = the real code with in-memory stand-ins; **planned** = not built.
+Details and measurements: [docs/evidence/production-verification.md](docs/evidence/production-verification.md).
 
 | Component | Status |
 |---|---|
@@ -164,13 +199,13 @@ automated tests; **planned** = not built. Details and measurements:
 | Mock AI provider | ✅ Verified in Azure — production default |
 | Azure OpenAI provider (Entra ID, timeouts, bounded retries) | ✅ Verified in Azure in a controlled, IP-restricted test (5 requests); production stays in mock mode |
 | Persistent usage limiter on Azure Table Storage | ✅ Verified in Azure |
-| Event-driven processing (Blob → Event Grid → Service Bus Basic → Container Apps Job) | ✅ Verified in Azure — 6 test submissions; **off by default** |
+| Event-driven processing (Blob → Event Grid → Service Bus Basic → Container Apps Job) | ✅ Verified in Azure — 6 test submissions; **off** for public submissions |
 | Retries, lease takeover, lock renewal, dead-lettering | 🧪 Verified locally (automated tests); not exercised in Azure |
+| Public *Try processing* demo (`DEMO_MODE_ENABLED`) | ◐ Deployed — **simulated** in memory; uses no Azure storage or messaging |
 | Terraform (incl. event-processing resources) | ✅ Applied; plan reports no drift |
 | CI, image publishing (GHCR, amd64 + arm64) | ✅ In use |
 | Deploy workflow (OIDC) | ✅ Written — **disabled** until credentials are reviewed |
-| Public demo of invoice processing (simulated scenario gallery, `DEMO_MODE_ENABLED`) | 🧪 Built and tested locally; not yet deployed |
-| Azure AI Search, Document Intelligence, authentication | ⏳ Planned |
+| Uploads for visitors, Azure AI Search, Document Intelligence, authentication | ⏳ Planned |
 
 ## Run locally
 
@@ -182,7 +217,7 @@ uv sync
 uv run pytest
 
 # Terminal 1 — FastAPI (API docs at http://127.0.0.1:8000/docs)
-uv run uvicorn invoiceiq.api.main:app_factory --factory --reload
+DEMO_MODE_ENABLED=true uv run uvicorn invoiceiq.api.main:app_factory --factory --reload
 
 # Terminal 2 — Streamlit (http://localhost:8501)
 uv run streamlit run src/invoiceiq/frontend/app.py
@@ -215,7 +250,8 @@ docker compose --profile azurite up --build
 ## Deploy to Azure (Terraform)
 
 > Deploying creates billable resources. Read
-> [docs/deployment-readiness.md](docs/deployment-readiness.md) first.
+> [docs/deployment-readiness.md](docs/deployment-readiness.md) first (a historical
+> pre-deployment review).
 
 Terraform in [infra/terraform](infra/terraform) creates: resource group, Log Analytics
 workspace, a Container Apps environment with only the serverless *Consumption* profile, the container app (0–1 replicas,
@@ -233,17 +269,20 @@ OIDC deploy identity.
    ```
 2. **Publish the image** with the manual *Publish image* workflow (GHCR, amd64 + arm64, full-SHA tag,
    only for commits whose CI passed) and copy the digest from the run summary.
-3. `cp infra/terraform/terraform.tfvars.example infra/terraform/terraform.tfvars` and fill in the
+3. `cp infra/terraform/terraform.tfvars.example infra/terraform/production.tfvars` and fill in the
    image, model, version and **real token prices** (Terraform refuses zero prices — the daily cost
    budget depends on them). `ai_provider` defaults to `mock`; set `azure_openai` to opt in to live
    answers. `worker_container_image` (optional, defaults to `container_image`) lets the web app and
-   the worker job be rolled out independently.
+   the worker job be rolled out independently. `demo_mode_enabled` shows the simulated demo.
 4. ```bash
    cd infra/terraform
    terraform init
-   terraform plan -out tfplan     # review every resource
-   terraform apply tfplan         # only after review
+   terraform plan -var-file=production.tfvars -out tfplan   # review every resource
+   terraform apply tfplan                                    # only after review
    ```
+   The file is deliberately **not** called `terraform.tfvars`: Terraform would load that
+   automatically, including in `terraform test`, where production values would hide the defaults
+   the tests check. Without `-var-file`, a plan stops with *No value for required variable*.
 5. Optional: set `github_repository` to create the OIDC deploy identity, then configure the
    repository variables listed at the top of [.github/workflows/deploy.yml](.github/workflows/deploy.yml).
 
@@ -288,6 +327,8 @@ about 10 minutes, then create the subscription. A reusable compatibility test li
   the facts panel never comes from the model.
 - Safe errors: no stack traces or submitted values in responses; correlation IDs link the UI to
   structured JSON logs; prompts and questions are never logged.
+- Public demo: catalog scenario IDs only (no file or JSON upload path), bounded memory, and no
+  Azure clients — tests fail if demo code constructs one.
 - Invoice upload (event-driven mode only, off in public): JSON only, ≤ 64 KB, schema-validated,
   separate daily allowance, private storage, 7-day retention; invoice-supplied text is rendered as
   escaped text, never as Markdown or HTML (security regression tests).
@@ -298,14 +339,14 @@ about 10 minutes, then create the subscription. A reusable compatibility test li
 | Suite | Tests | What it covers |
 |---|---:|---|
 | Unit | 178 | Every validation rule incl. boundaries and rounding, BM25, prompts, citations, providers (fake SDK client), cost accounting, supervisor |
-| Processing | 99 | Event parsing, Service Bus peek-lock semantics, leases, duplicates, lock expiry, crash recovery, retries, dead-lettering, concurrency, delivery-count normalisation |
-| API | 49 | All endpoints incl. submissions, error envelopes, correlation IDs, read-only modes, isolation from the AI allowance |
-| Frontend | 100 | Presentation logic, API client, every Streamlit page via `AppTest`, escaping of untrusted invoice text |
+| Processing | 112 | Event parsing, Service Bus peek-lock semantics, leases, duplicates, lock expiry, crash recovery, retries, dead-lettering, concurrency; the public demo's catalog, bounds and isolation from Azure |
+| API | 69 | All endpoints incl. submissions and demo, feature-flag matrix, error envelopes, correlation IDs, read-only modes |
+| Frontend | 113 | Presentation logic, API client, every Streamlit page via `AppTest`, navigation by feature flag, escaping of untrusted invoice text |
 | Integration | 54 | Usage and submission stores and Blob Storage on **Azurite**: ETags, atomic commits, concurrency, end-to-end worker path |
-| Terraform | 15 | Plan tests with mocked providers: scaling, keys disabled, least-privilege role scopes, Service Bus Basic, private containers, platform-only scaler identity, feature flags |
+| Terraform | 24 | Plan tests with mocked providers: scaling, keys disabled, least-privilege role scopes, Service Bus Basic, private containers, platform-only scaler identity, feature flags, safe defaults, independent web/worker images |
 
 ```bash
-uv run pytest --cov=invoiceiq        # 480 passed, 95% line coverage
+uv run pytest --cov=invoiceiq        # 526 passed, 95% line coverage
 # Azurite tests run when the emulator is up (CI requires it):
 docker run -d -p 127.0.0.1:10000:10000 -p 127.0.0.1:10002:10002 \
   mcr.microsoft.com/azure-storage/azurite:3.35.0 \
@@ -317,6 +358,8 @@ No automated test calls Azure or a live model. Production behaviour was verified
 in controlled and documented runs — see the [evidence](docs/evidence/production-verification.md).
 
 ## Key design decisions and trade-offs
+
+The [case study](docs/case-study.md) explains the main decisions in more depth.
 
 - **One container for both processes** keeps hosting at one scale-to-zero app. The trade-off is
   coupled scaling and a custom supervisor; splitting them is easy later because the UI only talks
@@ -330,15 +373,19 @@ in controlled and documented runs — see the [evidence](docs/evidence/productio
   understating the subtotal.
 - **Conservative cost accounting** over-counts when the outcome is ambiguous; the demo may go
   read-only slightly early, but it cannot overspend.
+- **A simulated public demo instead of public uploads:** visitors see the processing flow
+  without any path to write to Azure storage or queues.
 
 ## Known limitations
 
 - The public app runs with the mock provider. Live Azure OpenAI was verified only in a short,
   IP-restricted test (5 requests).
-- Event-driven processing is verified with 6 test submissions but switched off for the public.
-  Retries, lease takeover and dead-lettering are covered by automated tests, not yet exercised in
-  Azure. Processing from upload to result takes 24.5–35.7 s, almost all of it the worker
-  starting from zero.
+- Event-driven processing is verified with 6 test submissions but switched off for public
+  submissions. Retries, lease takeover and dead-lettering are covered by automated tests, not yet
+  exercised in Azure. Processing from upload to result takes 24.5–35.7 s, almost all of it the
+  worker starting from zero.
+- The *Try processing* demo is a simulation: its millisecond timings are not representative of
+  Azure, which is why the measured Azure run is shown beside it.
 - The processing demo's daily allowances live in memory: best-effort, reset whenever the app
   scales to zero, and per replica. They protect memory and CPU, not a budget — the demo makes no
   paid calls.
@@ -349,8 +396,9 @@ in controlled and documented runs — see the [evidence](docs/evidence/productio
   5 min in a hidden tab, with a 60 s warning; chat history is restored on Resume in the same tab.
   Verified on Azure: the app scaled to zero ~6 min after a pause.
 - Waking from zero takes ~25–35 s on Azure (measured average 28 s: replica scheduling, image
-  pull, container creation, ingress routing); the app itself starts in ~2–3 s. Resume shows a "Starting InvoiceIQ" screen meanwhile; a first
-  visit to the URL shows the browser's own loading indicator.
+  pull, container creation, ingress routing); the app itself starts in ~2–3 s. Resume shows a
+  "Starting InvoiceIQ" screen meanwhile; a first visit to the URL shows the browser's own loading
+  indicator.
 - Observability is per browser session; Azure Monitor dashboards are not yet built.
 - Mock answers are templates; only the live model writes free-form text.
 - Fictional data only; no authentication, no public uploads, no real financial integrations.
@@ -358,7 +406,8 @@ in controlled and documented runs — see the [evidence](docs/evidence/productio
 ## Event-driven processing
 
 Chat and analysis are **synchronous**. Real accounts-payable teams receive invoices continuously,
-so ingestion can also run **asynchronously** — deployed on Azure and verified, off by default:
+so ingestion can also run **asynchronously** — deployed on Azure and verified in controlled tests,
+off for public submissions:
 
 ```mermaid
 flowchart LR
@@ -372,10 +421,12 @@ flowchart LR
     ui["Streamlit / API"] --> jobs
 ```
 
-- **At-least-once delivery, exactly-once results.** The worker claims each submission with a
-  lease (ETag compare-and-set), never completes a message while another worker holds the lease,
-  and stores the result **before** completing the message. Duplicates are recognised; transient
-  failures retry and then dead-letter with a visible status.
+- **At-least-once delivery, idempotent processing.** Messages can arrive more than once. The
+  worker claims each submission with a lease (ETag compare-and-set), never completes a message
+  while another worker holds the lease, and stores the result **before** completing the message,
+  so a redelivered message finds the stored result instead of producing a second one. Transient
+  failures retry and then dead-letter with a visible status. (Duplicate, retry and dead-letter
+  paths are covered by automated tests; the Azure runs saw none.)
 - **Measured on Azure** (6 test submissions): upload to result **24.5–35.7 s**; message queued
   ≈ 0.8 s after upload; validation < 0.1 s. Almost all of the time is the worker starting from
   zero — the trade-off for paying nothing while idle.
@@ -394,7 +445,7 @@ Full write-up, including the Event Grid dead-letter authorization finding:
 | Setting | Effect |
 |---|---|
 | neither flag (default) | No processing endpoints; `/submissions` and `/demo` answer 404 `feature_disabled` |
-| `DEMO_MODE_ENABLED=true` | **Simulated** demo: `/demo/scenarios`, `/demo/runs`, `/demo/reference` and the *Try processing* page. Catalog scenarios only, in memory, bounded (200 runs, 1 h expiry). Never constructs an Azure client. Its daily allowances are **process-local and best-effort**: they reset when the replica restarts or scales to zero and are not shared between replicas. |
+| `DEMO_MODE_ENABLED=true` (public app) | **Simulated** demo: `/demo/scenarios`, `/demo/runs`, `/demo/reference` and the *Try processing* page. Catalog scenarios only, in memory, bounded (200 runs, 1 h expiry). Never constructs an Azure client. Its daily allowances are **process-local and best-effort**: they reset when the replica restarts or scales to zero and are not shared between replicas. |
 | `ASYNC_PROCESSING_ENABLED=true` | Live processing: `/submissions` and the *Process Invoice* page. With `SUBMISSION_BACKEND=azure` this uses Blob Storage, Service Bus and Table Storage — reserved for protected, non-public use. |
 
 The two flags are independent; the public configuration is demo on, live processing off.
@@ -415,5 +466,5 @@ src/invoiceiq/
 data/          fictional invoices, purchasing policy, demo scenarios, verified reference run
 infra/terraform/   Azure infrastructure + plan tests
 infra/manual-tests/  isolated Event Grid → Service Bus compatibility test
-docs/          design notes, production evidence, deployment readiness review, screenshots
+docs/          case study, design notes, production evidence, deployment readiness review, screenshots
 ```

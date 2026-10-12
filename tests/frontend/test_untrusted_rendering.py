@@ -156,3 +156,11 @@ def test_hostile_schema_field_names_render_as_text_only():
     assert "&lt;img src=z&gt;" in bodies  # the field name, escaped, in the details list
     assert "<img" not in bodies
     assert "value" not in " ".join(markdown_like_values(at))  # submitted values never echoed
+
+
+def test_timeline_html_escapes_both_columns():
+    from invoiceiq.frontend.components import timeline_html
+
+    out = timeline_html("<b>t</b>", [("<i>1</i>", "<script>x</script>")])
+    assert "<script>" not in out and "<i>" not in out and "<b>t</b>" not in out
+    assert "&lt;script&gt;x&lt;/script&gt;" in out

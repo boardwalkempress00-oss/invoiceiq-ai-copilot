@@ -165,11 +165,13 @@ def test_architecture_distinguishes_evidence_levels(run_page):
     assert statuses["Background worker (Container Apps Job)"] == "✓ Verified in Azure"
     assert statuses["Azure OpenAI provider"] == "✓ Verified in Azure (controlled)"
     assert statuses["Retries, lease takeover, dead-lettering"].startswith("✓ Verified locally")
-    assert statuses["Public demo of invoice processing"] == "✓ Verified locally (automated tests)"
+    assert statuses["Public demo of invoice processing"] == "◐ Deployed · simulated in memory"
     assert statuses["Azure AI Search"] == "○ Planned"
-    # Every status is one of the three evidence levels; nothing is left unlabelled.
+    # Every status is one of the four evidence levels; nothing is left unlabelled.
     assert all(
-        s.startswith(("✓ Verified in Azure", "✓ Verified locally", "○ Planned"))
+        s.startswith(
+            ("✓ Verified in Azure", "✓ Verified locally", "◐ Deployed · simulated", "○ Planned")
+        )
         for s in statuses.values()
     )
 

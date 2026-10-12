@@ -16,7 +16,7 @@ variables {
 run "cost_and_scaling_settings" {
   command = plan
 
-  # Explicit, so a local terraform.tfvars (which `terraform test` also loads) cannot change it.
+  # Explicit, so the test never depends on a default that a local auto-loaded tfvars could change.
   variables {
     budget_alert_email = null
   }

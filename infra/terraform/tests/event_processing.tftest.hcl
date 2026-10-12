@@ -158,8 +158,8 @@ variables {
   ai_price_input_per_1m  = "0.40"
   ai_price_output_per_1m = "1.60"
   budget_alert_email     = null
-  # Pinned like production: `terraform test` also loads a local terraform.tfvars, so every input
-  # an assertion depends on is set here explicitly (CI has no tfvars).
+  # Pinned like production; every input an assertion depends on is set here explicitly.
+  # (Production values live in production.tfvars, which `terraform test` never loads.)
   ai_provider = "mock"
 }
 
