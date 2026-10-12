@@ -1,97 +1,140 @@
-"""Architecture: what is implemented in Milestone 1 and what is planned for Milestone 2."""
+"""Architecture: what is deployed, how it was verified, and what is still planned.
+
+Every status says where the evidence comes from — verified in Azure, verified locally by
+automated tests, or planned. Measured numbers are copied from docs/evidence, never estimated.
+"""
 
 from __future__ import annotations
 
 import streamlit as st
 
+EVIDENCE_DOC = "docs/evidence/production-verification.md"
+
 st.title("Architecture")
 st.markdown(
     "InvoiceIQ separates **deterministic finance logic** from **language generation**. Python "
-    "decides whether an invoice is correct; the AI model only explains verified results."
+    "decides whether an invoice is correct; the AI model only explains verified results. "
+    "Invoices can also be processed **asynchronously** through an event-driven pipeline on "
+    "Azure — built, deployed and verified, but switched **off** for public visitors."
 )
 
-legend = st.columns(2)
-legend[0].badge("Implemented · Milestone 1", icon=":material/check_circle:", color="green")
-legend[1].badge("Planned · Milestone 2 (not built yet)", icon=":material/schedule:", color="gray")
+legend = st.columns(3)
+legend[0].badge("Verified in Azure", icon=":material/verified:", color="green")
+legend[1].badge("Verified locally (automated tests)", icon=":material/science:", color="blue")
+legend[2].badge("Planned (not built yet)", icon=":material/schedule:", color="gray")
 
 DIAGRAM = """
 digraph G {
-  rankdir=LR; bgcolor="transparent"; nodesep=0.35; ranksep=0.55;
-  node [shape=box, style="rounded,filled", fontname="Helvetica", fontsize=11,
+  rankdir=LR; bgcolor="transparent"; nodesep=0.3; ranksep=0.5;
+  node [shape=box, style="rounded,filled", fontname="Helvetica", fontsize=10,
         color="#1f5f99", fillcolor="#eef4fb", fontcolor="#1b2430", penwidth=1.2];
-  edge [color="#5b6676", fontname="Helvetica", fontsize=9, fontcolor="#5b6676"];
+  edge [color="#5b6676", fontname="Helvetica", fontsize=8, fontcolor="#5b6676"];
 
-  user [label="Browser\\n(recruiter)", shape=oval, fillcolor="#ffffff"];
-  subgraph cluster_m1 {
-    label="Implemented — one container (Milestone 1)"; fontname="Helvetica"; fontsize=11;
+  user [label="Browser", shape=oval, fillcolor="#ffffff"];
+  subgraph cluster_app {
+    label="Container App · 0–1 replicas · scale to zero"; fontname="Helvetica"; fontsize=10;
     style="rounded"; color="#0ca30c"; fontcolor="#0b6b0b";
-    ui   [label="Streamlit UI\\n(public, port 8501)"];
-    api  [label="FastAPI backend\\n(localhost only)"];
-    val  [label="Validation engine\\nPython Decimal"];
-    rag  [label="BM25 policy\\nretrieval"];
-    lim  [label="Usage limiter\\nsession + daily caps"];
-    data [label="Fictional invoices\\n+ policy (files)", shape=folder];
+    ui  [label="Streamlit UI\\n(public HTTPS)"];
+    api [label="FastAPI\\n(localhost only)"];
+    val [label="Validation engine\\nPython Decimal"];
+    rag [label="BM25 policy retrieval"];
+    lim [label="Usage limiter"];
   }
-  aoai [label="Azure OpenAI\\n(or offline mock)", fillcolor="#f3eefb", color="#6b4fa0"];
+  aoai [label="Azure OpenAI\\n(mock in production;\\nlive in controlled tests)",
+        fillcolor="#f3eefb", color="#6b4fa0"];
+  usage [label="Table aiusage\\n(daily AI quotas)", shape=cylinder];
 
-  subgraph cluster_m2 {
-    label="Planned — Milestone 2 (not implemented)"; fontname="Helvetica"; fontsize=11;
-    style="rounded,dashed"; color="#9aa3ae"; fontcolor="#5b6676";
-    node [style="rounded,dashed", fillcolor="#ffffff", color="#9aa3ae", fontcolor="#5b6676"];
-    blob [label="Blob Storage\\ninvoice upload"];
-    eg   [label="Event Grid"];
-    sb   [label="Service Bus queue\\n+ dead-letter"];
-    wrk  [label="Background worker"];
-    tbl  [label="Table Storage\\njobs + usage quota"];
-    srch [label="Azure AI Search"];
+  subgraph cluster_ep {
+    label="Event-driven processing · deployed, off by default"; fontname="Helvetica";
+    fontsize=10; style="rounded"; color="#0ca30c"; fontcolor="#0b6b0b";
+    blob [label="Blob container\\ninvoice-uploads (private)", shape=cylinder];
+    eg   [label="Event Grid\\nBlobCreated"];
+    sb   [label="Service Bus Basic\\nqueue + dead-letter"];
+    job  [label="Container Apps Job\\nworker (KEDA, 0–3)"];
+    jobs [label="Table invoicejobs\\n(status + results)", shape=cylinder];
+    dl   [label="Dead-letter storage\\naccount (dedicated)", shape=cylinder];
   }
+  srch [label="Azure AI Search", style="rounded,dashed", fillcolor="#ffffff", color="#9aa3ae",
+        fontcolor="#5b6676"];
 
   user -> ui [label="HTTPS"];
   ui -> api [label="HTTP (internal)"];
-  api -> val; api -> rag; api -> lim; val -> data; rag -> data;
-  api -> aoai;
-  blob -> eg -> sb -> wrk [style=dashed, color="#9aa3ae"];
-  wrk -> val [style=dashed, color="#9aa3ae", label="same engine"];
-  wrk -> tbl [style=dashed, color="#9aa3ae"];
-  lim -> tbl [style=dashed, color="#9aa3ae", label="production limiter"];
+  api -> val; api -> rag; api -> lim;
+  api -> aoai [label="managed identity"];
+  lim -> usage [label="ETags"];
+  api -> blob [label="upload"]; api -> jobs [label="Pending"];
+  blob -> eg -> sb [label="managed identity"];
+  eg -> dl [style=dashed, label="undeliverable"];
+  sb -> job [label="KEDA"];
+  job -> blob [label="read"]; job -> jobs [label="result"];
   rag -> srch [style=dashed, color="#9aa3ae", label="replaceable"];
 }
 """
 st.graphviz_chart(DIAGRAM, width="stretch")
 
-st.subheader("Components")
+st.subheader("Components and evidence")
 st.dataframe(
     [
-        {"Component": "Streamlit frontend", "Status": "✓ Implemented",
-         "Role": "Public UI. Calls the API only; contains no validation or AI logic."},
-        {"Component": "FastAPI backend", "Status": "✓ Implemented",
-         "Role": "Typed REST API (Pydantic). Thin routes delegate to services."},
-        {"Component": "Validation engine", "Status": "✓ Implemented",
-         "Role": "Pure Python Decimal, round-half-up: arithmetic, VAT, approvals, fields."},
-        {"Component": "BM25 policy retrieval", "Status": "✓ Implemented",
-         "Role": "Keyword ranking over numbered policy sections with stable citation IDs."},
-        {"Component": "Azure OpenAI provider", "Status": "✓ Implemented (not yet deployed)",
-         "Role": "Official OpenAI SDK, v1 endpoint, Entra ID auth, timeouts, bounded retries."},
-        {"Component": "Mock AI provider", "Status": "✓ Implemented",
-         "Role": "Deterministic offline answers from the same evidence. No cost."},
-        {"Component": "Usage limiter", "Status": "✓ Implemented (local stores)",
-         "Role": "Per-session and daily caps, fail-closed. Memory and SQLite stores."},
-        {"Component": "Azure Table Storage limiter", "Status": "○ Planned",
-         "Role": "Persistent, ETag-protected quota store required before live AI goes public."},
-        {"Component": "Blob Storage · Event Grid · Service Bus", "Status": "○ Planned (M2)",
-         "Role": "Event-driven invoice ingestion with retries and dead-lettering."},
-        {"Component": "Background worker", "Status": "○ Planned (M2)",
-         "Role": "Calls the same InvoiceService.process() used by the API today."},
-        {"Component": "Azure AI Search", "Status": "○ Planned (M2)",
-         "Role": "Could replace BM25 behind the existing PolicyRetriever interface."},
+        {"Component": "Streamlit frontend", "Status": "✓ Verified in Azure",
+         "Evidence": "Production app; five-page smoke tests after every change."},
+        {"Component": "FastAPI backend", "Status": "✓ Verified in Azure",
+         "Evidence": "Runs inside the same container, reachable only on localhost."},
+        {"Component": "Validation engine", "Status": "✓ Verified in Azure",
+         "Evidence": "Results in Azure matched local expectations for all six test invoices."},
+        {"Component": "BM25 policy retrieval", "Status": "✓ Verified in Azure",
+         "Evidence": "Citations such as PP-3.1 in live answers and in mock mode."},
+        {"Component": "Mock AI provider", "Status": "✓ Verified in Azure",
+         "Evidence": "Production default; AI spend shown as exactly 0."},
+        {"Component": "Azure OpenAI provider", "Status": "✓ Verified in Azure (controlled)",
+         "Evidence": "5 live requests in an IP-restricted test window; production stays in mock "
+                     "mode."},
+        {"Component": "Usage limiter on Table Storage", "Status": "✓ Verified in Azure",
+         "Evidence": "Daily counters decrement per question; session cap enforced."},
+        {"Component": "Blob upload · Event Grid · Service Bus Basic",
+         "Status": "✓ Verified in Azure",
+         "Evidence": "6 test submissions delivered once each; switched off afterwards."},
+        {"Component": "Background worker (Container Apps Job)", "Status": "✓ Verified in Azure",
+         "Evidence": "Scaled from zero by KEDA; at most 3 concurrent executions."},
+        {"Component": "Retries, lease takeover, dead-lettering",
+         "Status": "✓ Verified locally (automated tests)",
+         "Evidence": "Deterministic tests with Service Bus semantics; not exercised in Azure."},
+        {"Component": "Public demo of invoice processing", "Status": "○ Planned",
+         "Evidence": "Simulated scenario gallery, clearly labelled — not built yet."},
+        {"Component": "Azure AI Search", "Status": "○ Planned",
+         "Evidence": "Could replace BM25 behind the existing PolicyRetriever interface."},
     ],
     hide_index=True,
     width="stretch",
 )  # fmt: skip
 
+st.subheader("Measured in Azure")
+st.dataframe(
+    [
+        {"Measurement": "Upload → result (event-driven, worker from zero)",
+         "Result": "24.5 – 35.7 s", "Source": "6 test submissions (E1, E2)"},
+        {"Measurement": "Upload → message queued in Service Bus", "Result": "≈ 0.8 s",
+         "Source": "E1 status timeline"},
+        {"Measurement": "Worker validation time", "Result": "< 0.1 s",
+         "Source": "Worker logs"},
+        {"Measurement": "Web app wake-up from zero (Resume)", "Result": "average 28 s",
+         "Source": "3 cold starts after probe tuning"},
+        {"Measurement": "Duplicates, retries, dead-letters in tests", "Result": "0 / 0 / 0",
+         "Source": "Service Bus and Event Grid metrics, worker logs"},
+        {"Measurement": "Azure OpenAI requests during processing tests", "Result": "0",
+         "Source": "Azure OpenAI metrics"},
+    ],
+    hide_index=True,
+    width="stretch",
+)  # fmt: skip
+st.caption(
+    "Most of the processing time is the worker starting from zero (image pull and container "
+    "creation); validation itself is instant. That is the price of paying nothing while idle. "
+    f"Full evidence: `{EVIDENCE_DOC}`."
+)
+
 left, right = st.columns(2)
 with left, st.container(border=True):
-    st.markdown("**How a chat question is answered (implemented)**")
+    st.markdown("**How a chat question is answered**")
     st.markdown(
         "1. Streamlit sends the question and invoice ID to `POST /chat`.\n"
         "2. The backend loads the invoice and runs the validation engine.\n"
@@ -102,20 +145,47 @@ with left, st.container(border=True):
         "7. Verified facts are attached by Python — never by the model."
     )
 with right, st.container(border=True):
-    st.markdown("**Synchronous today, event-driven next**")
+    st.markdown("**How an invoice is processed asynchronously**")
     st.markdown(
-        "**Milestone 1 (now):** the user waits while the API validates and answers in a single "
-        "HTTP request. Simple and cheap — ideal for three bundled sample invoices.\n\n"
-        "**Milestone 2 (planned):** uploaded invoices land in Blob Storage; Event Grid "
-        "publishes an event; a Service Bus queue buffers work; a worker validates each invoice "
-        "and records the job status. Failures retry and then dead-letter instead of being lost. "
-        "The validation engine itself does not change."
+        "1. The API records the submission as *Pending*, then stores the file in a private "
+        "Blob container.\n"
+        "2. Event Grid publishes `BlobCreated` to a Service Bus Basic queue.\n"
+        "3. KEDA sees the message and starts a Container Apps Job from zero.\n"
+        "4. The worker claims the submission (lease + ETag), validates it with the same engine "
+        "and stores the result *before* completing the message.\n"
+        "5. Duplicates are recognised; failures retry, then dead-letter instead of being lost."
     )
 
-st.subheader("Design principles")
+st.subheader("Security boundaries")
+st.dataframe(
+    [
+        {"Identity": "Web app", "Can access": "Azure OpenAI (inference), table aiusage, "
+         "table invoicejobs, container invoice-uploads (read/write)"},
+        {"Identity": "Worker", "Can access": "Container invoice-uploads (read), table "
+         "invoicejobs, Service Bus queue (receive) — no Azure OpenAI"},
+        {"Identity": "Scaler (KEDA)", "Can access": "Service Bus queue metrics only; not usable "
+         "by container code"},
+        {"Identity": "Event Grid topic", "Can access": "Service Bus queue (send), dedicated "
+         "dead-letter storage account; plus an unused legacy role on one container in the main "
+         "account, pending clean-up"},
+    ],
+    hide_index=True,
+    width="stretch",
+)  # fmt: skip
+st.caption(
+    "All access uses managed identities and role assignments scoped to a single resource. "
+    "Storage shared keys, Service Bus keys and Azure OpenAI keys are disabled."
+)
+
+st.subheader("Design principles and trade-offs")
 st.markdown(
     "- **The AI never does financial arithmetic.** It cannot change an amount or a status.\n"
     '- **Grounded or nothing.** Missing evidence produces an explicit "does not answer" reply.\n'
     "- **Fail closed on cost.** If usage cannot be recorded, no AI call is made.\n"
-    "- **Replaceable edges.** Repository, retriever, AI provider and usage store are interfaces."
+    "- **Pay nothing while idle.** Web app and worker scale to zero; the cost is a cold start "
+    "of roughly half a minute.\n"
+    "- **At-least-once delivery, exactly-once results.** Idempotent processing instead of "
+    "paid duplicate detection (Service Bus Basic has no fixed monthly charge).\n"
+    "- **Replaceable edges.** Repository, retriever, AI provider, stores and queue are "
+    "interfaces."
 )

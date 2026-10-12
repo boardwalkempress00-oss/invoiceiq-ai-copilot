@@ -156,14 +156,22 @@ def test_chat_clear_conversation(run_page):
 # --- Architecture and Observability ----------------------------------------------------------
 
 
-def test_architecture_distinguishes_implemented_and_planned(run_page):
+def test_architecture_distinguishes_evidence_levels(run_page):
     at = run_page("architecture")
     assert not at.exception
     table = at.dataframe[0].value
     statuses = dict(zip(table["Component"], table["Status"], strict=True))
-    assert statuses["Validation engine"].startswith("✓ Implemented")
-    assert statuses["Azure AI Search"].startswith("○ Planned")
-    assert statuses["Background worker"].startswith("○ Planned")
+    assert statuses["Validation engine"] == "✓ Verified in Azure"
+    assert statuses["Background worker (Container Apps Job)"] == "✓ Verified in Azure"
+    assert statuses["Azure OpenAI provider"] == "✓ Verified in Azure (controlled)"
+    assert statuses["Retries, lease takeover, dead-lettering"].startswith("✓ Verified locally")
+    assert statuses["Public demo of invoice processing"] == "○ Planned"
+    assert statuses["Azure AI Search"] == "○ Planned"
+    # Every status is one of the three evidence levels; nothing is left unlabelled.
+    assert all(
+        s.startswith(("✓ Verified in Azure", "✓ Verified locally", "○ Planned"))
+        for s in statuses.values()
+    )
 
 
 def test_observability_with_no_traffic_shows_no_invented_metrics(run_page):

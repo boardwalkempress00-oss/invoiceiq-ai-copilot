@@ -67,7 +67,8 @@ def test_sample_submission_is_followed_until_completed(run_page):
         time.sleep(0.02)
     at.run()  # the status panel re-reads the submission
     assert not at.exception
-    text = " ".join(m.value for m in at.markdown)
-    assert "KFS-2026-0203" in text
+    # The invoice number comes from the submitted file, so it is rendered as escaped HTML.
+    html_text = " ".join(e.proto.body for e in at.get("html"))
+    assert "KFS-2026-0203" in html_text
     assert any(e.label.startswith("Invoice arithmetic — 2 finding(s)") for e in at.expander)
     assert at.session_state["submission_watch"] is False  # polling stopped at the final state
